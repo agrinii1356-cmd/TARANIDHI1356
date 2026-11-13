@@ -1,0 +1,118 @@
+@import "tailwindcss";
+
+@theme {
+  --color-bg: #f2eee6;
+  --color-surface: #fffdf8;
+  --color-surface-2: #ebe4d6;
+  --color-ink: #1c1916;
+  --color-muted: #6e675c;
+  --color-subtle: #8a8378;
+  --color-line: #ddd4c4;
+  --color-accent: #8b3a2a;
+  --color-accent-fg: #fffdf8;
+  --color-good: #2f5d3a;
+  --color-warn: #8a5a1a;
+  --color-bad: #8b3a2a;
+  --color-good-soft: #e4efe4;
+  --color-warn-soft: #f4ead6;
+  --color-bad-soft: #f3e3dc;
+  --font-display: "Fraunces", "Times New Roman", serif;
+  --font-sans: "Source Sans 3", "Segoe UI", system-ui, sans-serif;
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 20px;
+  --radius-xl: 28px;
+}
+
+html[data-theme="dark"] {
+  --color-bg: #141210;
+  --color-surface: #1f1b17;
+  --color-surface-2: #2a241e;
+  --color-ink: #f3efe6;
+  --color-muted: #b7aea0;
+  --color-subtle: #8f877c;
+  --color-line: #3a332c;
+  --color-accent: #e0a090;
+  --color-accent-fg: #1c1916;
+  --color-good: #8fcea0;
+  --color-warn: #e2c08a;
+  --color-bad: #e0a090;
+  --color-good-soft: #243028;
+  --color-warn-soft: #332818;
+  --color-bad-soft: #3a2822;
+}
+
+html[data-theme="divine"] {
+  --color-bg: #f8efdf;
+  --color-surface: #fff8ee;
+  --color-surface-2: #f3e2c4;
+  --color-ink: #c2410c;
+  --color-muted: #b45309;
+  --color-subtle: #c47a3a;
+  --color-line: #efd3b0;
+  --color-accent: #9a3412;
+  --color-accent-fg: #fff8ee;
+  --color-good: #9a3412;
+  --color-warn: #c2410c;
+  --color-bad: #7c2d12;
+  --color-good-soft: #fde7d0;
+  --color-warn-soft: #f8e0c8;
+  --color-bad-soft: #f6d2c4;
+}
+
+html[data-theme="professional"] {
+  --color-bg: #eef2f6;
+  --color-surface: #ffffff;
+  --color-surface-2: #e4ebf2;
+  --color-ink: #10243e;
+  --color-muted: #4e6278;
+  --color-subtle: #7b8b9c;
+  --color-line: #d3dde7;
+  --color-accent: #0f4c81;
+  --color-accent-fg: #f7fafc;
+  --color-good: #0f6b4c;
+  --color-warn: #8a5a12;
+  --color-bad: #8f2d2d;
+  --color-good-soft: #e5f3ec;
+  --color-warn-soft: #f6ecd8;
+  --color-bad-soft: #f8e6e6;
+  --font-display: "Source Sans 3", "Segoe UI", system-ui, sans-serif;
+}
+
+@layer base {
+  html {
+    background: var(--color-bg);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    max-width: 100%;
+    overflow-x: clip;
+  }
+  body {
+    min-height: 100dvh;
+    background: var(--color-bg);
+    color: var(--color-ink);
+    max-width: 100%;
+    overflow-x: clip;
+  }
+  button:not(:disabled),
+  [role="button"]:not(:disabled) {
+    cursor: pointer;
+  }
+  h1,
+  h2,
+  h3,
+  .font-display {
+    font-family: var(--font-display);
+    font-weight: 500;
+    letter-spacing: -0.03em;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

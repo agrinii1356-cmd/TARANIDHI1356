@@ -1,0 +1,1 @@
+import{d as e,l as t}from"./store-B35SU0HE.js";var n=e();function r({className:e,...r}){return(0,n.jsx)(`div`,{className:t(`rounded-[28px] border border-line bg-surface p-5`,e),...r})}export{r as t};
