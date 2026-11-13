@@ -1,1 +1,0 @@
-- TaraNidhi app: Hora is 60 minutes from sunrise; Uphora is the second 30-minute half of the same hora (same planet, weaker score). Mukhya is the first 30 minutes. [2026-10-31]
