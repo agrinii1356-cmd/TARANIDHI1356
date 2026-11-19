@@ -42,7 +42,9 @@ export function UpiPay({
         <div className="mx-auto size-52 rounded-xl bg-surface-2" />
       )}
       <div className="space-y-3 text-sm">
-        <p className="text-muted">{t("scan")}</p>
+        <p className="text-base leading-relaxed text-muted">
+          {t("scan")} The bank sees the payment. This app does not. A scanner cannot tell us the money arrived. After you pay, write the UTR from the bank SMS. The plan turns on in this phone only. Match that UTR in your bank before you trust it.
+        </p>
         <p className="tabular-nums">
           ₹{amount} · {MERCHANT_VPA}
         </p>

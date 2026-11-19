@@ -8,6 +8,7 @@ import {
   sunRiseSet,
   toJulianDay,
   localToUtc,
+  trueNodeSidereal,
 } from "./astronomy";
 import {
   AMRIT_SIDDHI,
@@ -486,6 +487,8 @@ export type BirthChart = {
   lagnaIndex: number;
   grahas: NatalGraha[];
   birth: Date;
+  /** Birth paksha from the birth place, not the muhurta place. */
+  birthShukla: boolean;
 };
 
 const DIGBAL_HOUSE: Record<string, number> = {
@@ -509,6 +512,7 @@ export function getBirthChart(
   const lagnaIndex = Math.floor(norm360(lagnaLon) / 30) % 12;
   const moonIndex = p.moonRashi.index;
   const jd = toJulianDay(localToUtc(dobLocal, tzOffset));
+  const rahu = trueNodeSidereal(jd);
   const bodies: Array<[string, number]> = [
     ["Sun", sidereal(sunLongitude(jd), jd)],
     ["Moon", p.moonSid],
@@ -517,6 +521,8 @@ export function getBirthChart(
     ["Jupiter", planetSidereal("Jupiter", jd)],
     ["Venus", planetSidereal("Venus", jd)],
     ["Saturn", planetSidereal("Saturn", jd)],
+    ["Rahu", rahu],
+    ["Ketu", norm360(rahu + 180)],
   ];
   const grahas: NatalGraha[] = bodies.map(([name, lon]) => {
     const nk = nakshatraFromLon(lon);
@@ -545,6 +551,7 @@ export function getBirthChart(
     lagnaIndex,
     grahas,
     birth: dobLocal,
+    birthShukla: p.tithi.paksha === "Shukla",
   };
 }
 

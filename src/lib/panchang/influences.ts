@@ -1,4 +1,4 @@
-import { planetSidereal, sidereal, sunLongitude, toJulianDay, localToUtc } from "./astronomy";
+import { planetSidereal, sidereal, sunLongitude, toJulianDay, localToUtc, trueNodeSidereal } from "./astronomy";
 
 export const BIRDS = ["Vulture", "Owl", "Crow", "Cock", "Peacock"] as const;
 export type Bird = (typeof BIRDS)[number];
@@ -99,6 +99,8 @@ const GOCHAR_HOUSES: Record<string, number[]> = {
   Jupiter: [2, 5, 7, 9, 11],
   Venus: [1, 2, 3, 4, 5, 7, 8, 9, 11, 12],
   Saturn: [3, 6, 11],
+  Rahu: [3, 6, 10, 11],
+  Ketu: [3, 6, 9, 12],
 };
 const GOCHAR_WEIGHT: Record<string, number> = {
   Jupiter: 3,
@@ -107,6 +109,8 @@ const GOCHAR_WEIGHT: Record<string, number> = {
   Mars: 2,
   Sun: 1,
   Mercury: 1,
+  Rahu: 2,
+  Ketu: 1,
 };
 
 export type GocharHit = { planet: string; house: number; good: boolean };
@@ -124,6 +128,9 @@ export function gocharAt(local: Date, tz: number, natalMoonRashi: number): Gocha
   for (const name of ["Mars", "Mercury", "Jupiter", "Venus", "Saturn"]) {
     add(name, Math.floor(planetSidereal(name, jd) / 30) % 12);
   }
+  const rahu = Math.floor(trueNodeSidereal(jd) / 30) % 12;
+  add("Rahu", rahu);
+  add("Ketu", (rahu + 6) % 12);
   let goodW = 0;
   let total = 0;
   for (const hit of hits) {

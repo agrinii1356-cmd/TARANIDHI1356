@@ -1,21 +1,20 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Label } from "@/components/ui/input";
-import { addDaysISO, formatTime, formatWhen, qualityTone, todayISODate } from "@/lib/format";
+import { addDaysISO, formatTime, formatWhen, todayISODate } from "@/lib/format";
 import { ACTIVITIES, CATEGORIES, getActivity, type Paddhati, type Tier } from "@/lib/panchang/activities";
 import { PARASHAR_CATEGORIES } from "@/lib/panchang/parashar";
 import { chartFromProfile, useProfile } from "@/lib/panchang/store";
-import { CITIES } from "@/lib/panchang/cities";
+import { refreshGps, useEventPlace, useHere } from "@/lib/panchang/here";
+import { PlacePicker } from "@/components/place-picker";
 import { searchMuhurats, type ScoreResult } from "@/lib/panchang/scoring";
 import { planAccess, useBilling } from "@/lib/billing";
 import { useT } from "@/lib/prefs";
 import { localName } from "@/lib/panchang/names";
-import { eventPrabhav } from "@/lib/panchang/prabhav";
 
-type Search = { activity?: string };
+type Search = { activity?: string; on?: string };
 
 const CAT_HI: Record<string, string> = {
   All: "सब",
@@ -58,21 +57,23 @@ const CAT_HI: Record<string, string> = {
 export const Route = createFileRoute("/muhurat")({
   validateSearch: (s: Record<string, unknown>): Search => ({
     activity: typeof s.activity === "string" ? s.activity : undefined,
+    on: typeof s.on === "string" && /^\d{4}-\d{2}-\d{2}$/.test(s.on) ? s.on : undefined,
   }),
   component: MuhuratPage,
 });
 
 function MuhuratPage() {
-  const { activity: qActivity } = Route.useSearch();
+  const { activity: qActivity, on: qOn } = Route.useSearch();
   const profile = useProfile((s) => s.profile);
   const access = planAccess(useBilling());
   const { lang, t } = useT();
   const [paddhati, setPaddhati] = useState<Paddhati>("advance");
   const [tier, setTier] = useState<Tier | "all">("all");
   const [activity, setActivity] = useState(qActivity ?? "job_interview");
-  const [start, setStart] = useState(todayISODate());
-  const [end, setEnd] = useState(addDaysISO(todayISODate(), 14));
-  const [eventCity, setEventCity] = useState("");
+  const [start, setStart] = useState(qOn ?? todayISODate());
+  const [end, setEnd] = useState(addDaysISO(qOn ?? todayISODate(), 14));
+  const event = useEventPlace(profile);
+  const setHere = useHere((s) => s.setPlace);
   const [filter, setFilter] = useState("All");
   const [sub, setSub] = useState("All");
   const [query, setQuery] = useState("");
@@ -80,6 +81,13 @@ function MuhuratPage() {
   const [blocked, setBlocked] = useState(false);
   const [busy, setBusy] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+
+  useEffect(() => {
+    if (!qOn) return;
+    setStart(qOn);
+    setEnd(addDaysISO(qOn, 14));
+    setResults(null);
+  }, [qOn]);
 
   useEffect(() => {
     if (!qActivity) return;
@@ -140,10 +148,10 @@ function MuhuratPage() {
     setBlocked(false);
     setBusy(true);
     const chart = chartFromProfile(profile);
-    const city = CITIES.find((c) => c.name === eventCity);
-    const lat = city?.lat ?? profile.lat;
-    const lon = city?.lon ?? profile.lon;
-    const tz = city?.tz ?? profile.tz;
+    const lat = event?.lat ?? profile.lat;
+    const lon = event?.lon ?? profile.lon;
+    const tz = event?.tz ?? profile.tz;
+    const placeLabel = [event?.name || profile.city, event?.region].filter(Boolean).join(", ");
     const found = searchMuhurats({
       activityKey: current.key,
       start: new Date(start + "T00:00:00"),
@@ -155,7 +163,25 @@ function MuhuratPage() {
       maxResults: 1,
       minScore: current.tier === "major" ? 58 : 50,
     });
+    for (const row of [...found.priority, ...found.alerts]) {
+      if (row.muhurta) row.muhurta.place = placeLabel || `${lat.toFixed(2)}, ${lon.toFixed(2)}`;
+    }
     setResults(found);
+    try {
+      const key = "taranidhi-queries";
+      const prev = JSON.parse(localStorage.getItem(key) || "[]") as unknown[];
+      prev.push({
+        at: new Date().toISOString(),
+        who: profile.name,
+        activity: current.key,
+        from: start,
+        to: end,
+        place: placeLabel || profile.city,
+      });
+      localStorage.setItem(key, JSON.stringify(prev.slice(-200)));
+    } catch {
+      /* the phone can refuse storage; the muhurat still shows */
+    }
     setBusy(false);
   }
 
@@ -286,6 +312,66 @@ function MuhuratPage() {
                   : "Categories"}
             </button>
           </div>
+          <div>
+            <PlacePicker
+              id="place"
+              label={lang === "hi" ? "मुहूर्त का स्थान" : "Muhurta place"}
+              value={event}
+              onChange={(p) => {
+                setHere(p, "picked");
+                setResults(null);
+              }}
+            />
+            <button
+              type="button"
+              className="mt-2 text-sm text-accent underline-offset-2 hover:underline"
+              onClick={() => refreshGps(setHere)}
+            >
+              {lang === "hi" ? "मेरी जगह (GPS)" : "My location (GPS)"}
+            </button>
+            <p className="mt-1 text-sm text-muted">
+              {lang === "hi"
+                ? "डिफ़ॉल्ट वही जगह है जहाँ आप अभी हैं। शहर, देश या GPS बदलने से हर खिड़की उसी जगह की बनेगी। जन्म कुंडली जन्म स्थान पर रहती है। राहु ट्रू नोड है।"
+                : "The default is where you are now. A city, country or GPS change rebuilds every window for that place. The birth chart stays on the birth place. Rahu is the true node."}
+            </p>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <Label htmlFor="start">{lang === "hi" ? "से" : "From"}</Label>
+              <input
+                id="start"
+                type="date"
+                value={start}
+                onChange={(e) => setStart(e.target.value)}
+                className="h-12 w-full rounded-md border border-line px-3 text-base"
+              />
+            </div>
+            <div>
+              <Label htmlFor="end">{lang === "hi" ? "तक" : "Until"}</Label>
+              <input
+                id="end"
+                type="date"
+                value={end}
+                onChange={(e) => setEnd(e.target.value)}
+                className="h-12 w-full rounded-md border border-line px-3 text-base"
+              />
+            </div>
+          </div>
+          <Button type="button" className="w-full" size="lg" disabled={busy || !current} onClick={ask}>
+            {busy
+              ? lang === "hi"
+                ? "आकाश पढ़ रहा है…"
+                : "Reading the sky…"
+              : `Submit · ${lang === "hi" ? current?.nameHi : current?.name}`}
+          </Button>
+          {blocked ? (
+            <p className="text-base text-bad">
+              {lang === "hi" ? "डेमो खत्म। " : "Demo ended. "}
+              <Link to="/profile" className="underline">
+                {t("pay")}
+              </Link>
+            </p>
+          ) : null}
           <div className={menuOpen ? "grid min-w-0 gap-3 sm:grid-cols-[11rem_minmax(0,1fr)]" : "min-w-0"}>
             {menuOpen ? (
               <nav className="max-h-72 space-y-0.5 overflow-y-auto rounded-lg border border-line p-1">
@@ -356,13 +442,13 @@ function MuhuratPage() {
                     }}
                     className={
                       current?.key === a.key
-                        ? "flex w-full min-w-0 items-center justify-between gap-3 rounded-lg bg-ink px-3 py-2 text-left text-sm text-bg"
-                        : "flex w-full min-w-0 items-center justify-between gap-3 rounded-lg bg-surface-2 px-3 py-2 text-left text-sm"
+                        ? "flex w-full min-w-0 items-center justify-between gap-3 rounded-lg bg-ink px-3 py-3 text-left text-base text-bg"
+                        : "flex w-full min-w-0 items-center justify-between gap-3 rounded-lg bg-surface-2 px-3 py-3 text-left text-base"
                     }
                   >
                     <span className="min-w-0">
                       {lang === "hi" ? a.nameHi : a.name}
-                      <span className="mt-0.5 block text-xs opacity-70">
+                      <span className="mt-0.5 block text-sm opacity-70">
                         {lang === "hi" ? a.name : a.nameHi}
                       </span>
                     </span>
@@ -379,61 +465,6 @@ function MuhuratPage() {
             ) : null}
             </div>
           </div>
-          <div>
-            <Label htmlFor="place">{lang === "hi" ? "मुहूर्त का स्थान" : "Muhurta place"}</Label>
-            <select
-              id="place"
-              value={eventCity}
-              onChange={(e) => setEventCity(e.target.value)}
-              className="h-11 w-full rounded-md border border-line bg-surface px-3 text-sm"
-            >
-              <option value="">
-                {lang === "hi" ? "प्रोफाइल का स्थान" : "Profile place"} ({profile.city})
-              </option>
-              {CITIES.slice(0, 80).map((c) => (
-                <option key={c.name} value={c.name}>
-                  {c.name}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <Label htmlFor="start">{lang === "hi" ? "से" : "From"}</Label>
-              <input
-                id="start"
-                type="date"
-                value={start}
-                onChange={(e) => setStart(e.target.value)}
-                className="h-11 w-full rounded-md border border-line px-3"
-              />
-            </div>
-            <div>
-              <Label htmlFor="end">{lang === "hi" ? "तक" : "Until"}</Label>
-              <input
-                id="end"
-                type="date"
-                value={end}
-                onChange={(e) => setEnd(e.target.value)}
-                className="h-11 w-full rounded-md border border-line px-3"
-              />
-            </div>
-          </div>
-          <Button type="button" className="w-full" size="lg" disabled={busy || !current} onClick={ask}>
-            {busy
-              ? lang === "hi"
-                ? "आकाश पढ़ रहा है…"
-                : "Reading the sky…"
-              : `Submit · ${lang === "hi" ? current?.nameHi : current?.name}`}
-          </Button>
-          {blocked ? (
-            <p className="text-sm text-bad">
-              {lang === "hi" ? "डेमो खत्म। " : "Demo ended. "}
-              <Link to="/profile" className="underline">
-                {t("pay")}
-              </Link>
-            </p>
-          ) : null}
         </Card>
       </div>
 
@@ -463,8 +494,7 @@ function MuhuratPage() {
           ) : (
             <div className="space-y-3">
               <h2 className="text-sm font-medium">
-                {lang === "hi" ? "एक मुहूर्त" : "One muhurat"} ·{" "}
-                {lang === "hi" ? current?.nameHi : current?.name}
+                {lang === "hi" ? "आपका समय" : "Your time"}
               </h2>
               <ScoreCard title={formatWhen(results.priority[0].datetime)} result={results.priority[0]} />
             </div>
@@ -483,183 +513,130 @@ function MuhuratPage() {
 
 function ScoreCard({ title, result, alert }: { title: string; result: ScoreResult; alert?: boolean }) {
   const { lang } = useT();
+  const hi = lang === "hi";
   const nm = (name: string) => localName(name, lang);
   const act = getActivity(result.activityKey);
   const p = result.panchang;
-  const prabhav = act ? eventPrabhav(act, p, lang) : null;
+  const name = (hi ? act?.nameHi : result.activityName) ?? result.activityName;
+  const closed = result.sutra.blocks.length > 0 || alert;
+  const go = !closed && result.finalScore >= 65;
+  const start = formatTime(p.horaWindow.start);
+  const end = formatTime(p.horaWindow.end);
+  const halfA = formatTime(p.horaWindow.halfStart);
+  const halfB = formatTime(p.horaWindow.halfEnd);
+  const firstHalf = p.uphora.half === 1;
+  const dashaWeak = result.breakdown.dasha < 50;
+  const star = result.navtaraFlag;
+  const verdict = closed
+    ? hi ? "इस समय मत जाइए" : "Do not go at this time"
+    : go
+      ? hi ? "इस समय जाइए" : "Go at this time"
+      : hi ? "जा सकते हैं, बेहतर घंटा भी देखें" : "You can go. A better hour may exist";
+  const points = [
+    star === "priority"
+      ? hi ? "आपका जन्म नक्षत्र और यह नक्षत्र मित्र हैं। यही वजह है कि यह घंटा चुना गया।" : "Your birth star and this star are friends. That is why this hour was chosen."
+      : star === "alert"
+        ? hi ? "यह नक्षत्र आपके जन्म नक्षत्र के विरुद्ध है। इस नक्षत्र में काम शुरू न करें।" : "This star works against your birth star. Do not start the work while it lasts."
+        : hi ? "यह नक्षत्र न मित्र है, न शत्रु। समय चल सकता है।" : "This star is neither a friend nor an enemy. The hour can still work.",
+    firstHalf
+      ? hi ? `मजबूत आधा घंटा ${halfA} से ${halfB} है। बात इसी में शुरू करें।` : `The stronger half is ${halfA} to ${halfB}. Start the talk then.`
+      : hi ? `यह घंटे का कमजोर आधा है (${halfA}–${halfB})। हो सके तो पहले आधे घंटे का इंतज़ार करें।` : `This is the weaker half of the hour (${halfA}–${halfB}). Wait for the first half if you can.`,
+    dashaWeak
+      ? hi ? `अभी की दशा ${nm(result.dasha.maha)} कमजोर है। मुलाकात छोटी रखें।` : `Your current period, ${nm(result.dasha.maha)}, is the weak part. Keep the meeting short.`
+      : hi ? `अभी की दशा ${nm(result.dasha.maha)} इस काम के साथ है।` : `Your current period, ${nm(result.dasha.maha)}, supports this work.`,
+  ];
   const w = result.weights;
   const pct = (n: number) => `${Math.round(n * 100)}%`;
   const parts = [
-    [lang === "hi" ? "पंचांग" : "Panchang", result.breakdown.panchanga, pct(w.panch)],
-    [lang === "hi" ? "ताराबल" : "Tarabal", result.breakdown.navtara, pct(w.navtara)],
-    [lang === "hi" ? "चंद्र" : "Moon", result.breakdown.chandra, pct(w.chandra)],
-    [lang === "hi" ? "होरा" : "Hora", result.breakdown.hora, pct(w.hora)],
-    [lang === "hi" ? "पक्षी" : "Pakshi", result.breakdown.pakshi, pct(w.pakshi)],
-    [lang === "hi" ? "गोचर" : "Gochar", result.breakdown.gochar, pct(w.gochar)],
-    [lang === "hi" ? "दशा" : "Dasha", result.breakdown.dasha, pct(w.dasha)],
-    [lang === "hi" ? "योग" : "Yoga", result.breakdown.golden, pct(w.golden)],
+    [hi ? "पंचांग" : "Panchang", result.breakdown.panchanga, pct(w.panch)],
+    [hi ? "तारा" : "Star", result.breakdown.navtara, pct(w.navtara)],
+    [hi ? "चंद्र" : "Moon", result.breakdown.chandra, pct(w.chandra)],
+    [hi ? "घड़ी" : "Hour", result.breakdown.hora, pct(w.hora)],
+    [hi ? "पक्षी" : "Bird", result.breakdown.pakshi, pct(w.pakshi)],
+    [hi ? "गोचर" : "Transit", result.breakdown.gochar, pct(w.gochar)],
+    [hi ? "दशा" : "Period", result.breakdown.dasha, pct(w.dasha)],
+    [hi ? "योग" : "Yoga", result.breakdown.golden, pct(w.golden)],
   ] as const;
+
   return (
-    <Card className={alert ? "rounded-xl border-bad p-4" : "rounded-xl p-4"}>
-      <p className="text-xs text-muted">{title}</p>
-      <div className="mt-2 grid gap-1.5 text-xs leading-relaxed">
-        <p className="rounded-md bg-surface-2 px-2 py-1.5">
-          {lang === "hi" ? "1. समय" : "1. Time"} · {nm(p.horaLord)}{" "}
-          {formatTime(p.horaWindow.start)}–{formatTime(p.horaWindow.end)}{" "}
-          {lang === "hi" ? "(होरा 60 मिनट)" : "(hora 60 min)"}
-        </p>
-        <p className="rounded-md bg-surface-2 px-2 py-1.5">
-          {lang === "hi" ? "2. स्कोर" : "2. Score"} ·{" "}
-          {p.uphora.half === 1
-            ? lang === "hi"
-              ? `मुख्य ${formatTime(p.horaWindow.halfStart)}–${formatTime(p.horaWindow.halfEnd)} — जोड़`
-              : `Mukhya ${formatTime(p.horaWindow.halfStart)}–${formatTime(p.horaWindow.halfEnd)} — adds`
-            : lang === "hi"
-              ? `उपहोरा ${formatTime(p.horaWindow.halfStart)}–${formatTime(p.horaWindow.halfEnd)} — 10 कम`
-              : `Uphora ${formatTime(p.horaWindow.halfStart)}–${formatTime(p.horaWindow.halfEnd)} — 10 less`}
-        </p>
-        <p className="rounded-md bg-surface-2 px-2 py-1.5">
-          {lang === "hi" ? "3. प्रभाव" : "3. Effect"} · {nm(p.horaLord)}{" "}
-          {p.uphora.half === 1
-            ? lang === "hi"
-              ? "मुख्य में भारी"
-              : "weighs more in mukhya"
-            : lang === "hi"
-              ? "उपहोरा में हल्का"
-              : "lighter in uphora"}
-          {" · "}KP {p.kpSub.index}/7 {nm(p.kpSub.lord)}
-        </p>
-      </div>
-      {alert ? (
-        <p className="mt-1 text-sm text-bad">
-          {nm(result.tara.name)} · {nm(p.nakshatra.name)}
-        </p>
-      ) : null}
-      <div className="mt-1 flex items-center justify-between gap-3">
-        <div className="font-display text-3xl tabular-nums">
-          {result.finalScore}
-          <span className="ml-2 align-middle">
-            <Badge tone={alert || result.sutra.blocks.length ? "bad" : qualityTone(result.quality)}>
-              {result.sutra.blocks.length ? nm("Avoid") : alert ? nm("Alert") : nm(result.quality)}
-            </Badge>
-          </span>
-        </div>
-        <span className="text-xs text-muted">{nm(result.recommendation)}</span>
-      </div>
-      <p className="mt-1 text-xs text-muted">
-        {(lang === "hi" ? getActivity(result.activityKey)?.nameHi : result.activityName) ?? result.activityName} · {nm(p.tithi.name)} · {nm(p.nakshatra.name)} · {nm(p.vara.name)} · {nm(result.sutra.lagna)} {lang === "hi" ? "लग्न" : "lagna"}
-      </p>
-      <p className="mt-2 text-sm leading-relaxed">
-        {prabhav?.lines.map((line) => (
-          <span
-            key={line}
-            className={
-              prabhav.tone === "bad"
-                ? "mt-1 block text-bad"
-                : prabhav.tone === "good"
-                  ? "mt-1 block text-good"
-                  : "mt-1 block text-muted"
-            }
-          >
-            {line}
-          </span>
-        ))}
-      </p>
-      <p className="mt-2 text-xs text-muted">
-        {lang === "hi"
-          ? "आधार: जन्म कुंडली + मुहूर्त लग्न कुंडली + मुहूर्त नवमांश। स्थान अनिवार्य।"
-          : "Basis: birth chart + muhurta lagna chart + muhurta navamsa. Place is required."}
-      </p>
-      <div className="mt-3 grid gap-2 sm:grid-cols-2">
-        {result.birth ? (
-          <div className="rounded-lg border border-line p-2 text-xs">
-            <p className="font-medium">{lang === "hi" ? "जन्म कुंडली" : "Birth chart"}</p>
-            <p className="mt-1 text-muted">
-              {lang === "hi" ? "लग्न" : "Lagna"} {nm(result.birth.lagna)} · {nm(result.birth.nakshatra)} · {nm(result.birth.rashi)}
+    <article className="overflow-hidden rounded-2xl border border-[#d4b15a]/50 bg-[#070b18] text-[#f6e7c1] shadow-[0_0_40px_rgba(212,177,90,0.12)]">
+      <img src="/logo.png" alt="TaraNidhi" className="mx-auto h-36 w-full max-w-md object-cover object-[center_42%]" />
+      <div className="space-y-4 px-4 pb-5 sm:px-6">
+        <div className="text-center">
+          <p className="text-[11px] uppercase tracking-[0.22em] text-[#d4b15a]">{name}</p>
+          <p className="mt-1 font-display text-2xl text-[#fff6dc]">{title}</p>
+          <p className="mt-3 font-display text-4xl tabular-nums text-[#ffe08a]">
+            {start}
+            <span className="mx-2 text-lg text-[#d4b15a]">–</span>
+            {end}
+          </p>
+          <p className="mt-1 text-sm text-[#cbb892]">
+            {hi ? "पूरा घंटा। शुरू करें" : "Full hour. Start"} {halfA}–{halfB}
+          </p>
+          {result.muhurta?.place ? (
+            <p className="mt-1 text-sm text-[#cbb892]">
+              {hi ? "जगह" : "Place"} · {result.muhurta.place}
             </p>
-            <ul className="mt-1 space-y-0.5">
-              {result.birth.grahas.map((g) => (
-                <li key={"b-" + g.name}>
-                  {nm(g.name)} · {nm(g.rashi)} · {lang === "hi" ? "भाव" : "house"} {g.house}
-                  {g.digbal ? " · digbal" : ""} · D9 {nm(g.d9)}
-                </li>
-              ))}
-            </ul>
+          ) : null}
+        </div>
+
+        <div className="flex items-center justify-between gap-3 rounded-xl border border-[#d4b15a]/30 bg-[#10182c] px-4 py-3">
+          <div>
+            <p className="font-display text-3xl tabular-nums text-[#ffe08a]">{result.finalScore}</p>
+            <p className="text-xs uppercase tracking-widest text-[#d4b15a]">
+              {closed ? (hi ? "बंद" : "Closed") : nm(result.quality)}
+            </p>
           </div>
-        ) : null}
-        {result.muhurta ? (
-          <>
-          <div className="rounded-lg border border-line p-2 text-xs">
-            <p className="font-medium">{lang === "hi" ? "मुहूर्त लग्न कुंडली" : "Muhurta lagna chart"}</p>
-            <p className="mt-1 text-muted">{lang === "hi" ? "लग्न" : "Lagna"} {nm(result.muhurta.lagna)} · {result.muhurta.place}</p>
-            <ul className="mt-1 space-y-0.5">
-              {result.muhurta.grahas.map((g) => (
-                <li key={g.name}>
-                  {nm(g.name)} · {nm(g.rashi)} · {lang === "hi" ? "भाव" : "house"} {g.house}
-                  {g.digbal ? " · digbal" : ""}
-                </li>
-              ))}
-            </ul>
+          <p className="max-w-[14rem] text-right text-sm leading-snug text-[#fff6dc]">{verdict}</p>
+        </div>
+
+        <ol className="space-y-2 text-sm leading-relaxed text-[#f3e6c4]">
+          {points.map((line, i) => (
+            <li key={line} className="flex gap-3">
+              <span className="mt-0.5 text-[#d4b15a]">{i + 1}</span>
+              <span>{line}</span>
+            </li>
+          ))}
+        </ol>
+
+        <details className="rounded-xl border border-[#d4b15a]/25 bg-[#0c1224] px-3 py-2 text-xs text-[#cbb892]">
+          <summary className="cursor-pointer py-1 text-sm text-[#ffe08a]">
+            {hi ? "पूरा हिसाब और कुंडली" : "Full count and charts"}
+          </summary>
+          <p className="mt-2">
+            {nm(p.tithi.name)} · {nm(p.nakshatra.name)} · {nm(p.vara.name)} · {nm(result.sutra.lagna)} {hi ? "लग्न" : "lagna"}
+          </p>
+          <div className="mt-3 space-y-1.5">
+            {parts.map(([label, score, weight]) => (
+              <div key={label} className="grid grid-cols-[5.5rem_1fr_2rem] items-center gap-2">
+                <span>{label} {weight}</span>
+                <span className="h-1 overflow-hidden rounded-full bg-[#1c2744]">
+                  <span className="block h-full bg-[#d4b15a]" style={{ width: `${score}%` }} />
+                </span>
+                <span className="text-right tabular-nums">{score}</span>
+              </div>
+            ))}
           </div>
-          <div className="rounded-lg border border-line p-2 text-xs">
-            <p className="font-medium">{lang === "hi" ? "मुहूर्त नवमांश" : "Muhurta navamsa"}</p>
-            <p className="mt-1 text-muted">{lang === "hi" ? "D9 लग्न" : "D9 lagna"} {nm(result.muhurta.lagnaD9)}</p>
-            <ul className="mt-1 space-y-0.5">
-              {result.muhurta.grahas.map((g) => (
-                <li key={g.name + "-d9"}>
-                  {nm(g.name)} · D9 {nm(g.d9)}
-                </li>
-              ))}
-            </ul>
-          </div>
-          </>
-        ) : null}
+          {result.birth ? (
+            <p className="mt-3">
+              {hi ? "जन्म" : "Birth"} · {nm(result.birth.lagna)} · {nm(result.birth.nakshatra)} · {nm(result.birth.rashi)}
+            </p>
+          ) : null}
+          {result.muhurta ? (
+            <p className="mt-1">
+              {hi ? "मुहूर्त लग्न" : "Muhurta lagna"} {nm(result.muhurta.lagna)} · D9 {nm(result.muhurta.lagnaD9)} · {result.muhurta.place}
+            </p>
+          ) : null}
+          <ul className="mt-2 space-y-1">
+            {result.birth?.grahas.map((g) => (
+              <li key={"b" + g.name}>{hi ? "जन्म" : "Birth"} {nm(g.name)} · {nm(g.rashi)} · {g.house}</li>
+            ))}
+            {result.muhurta?.grahas.map((g) => (
+              <li key={"m" + g.name}>{hi ? "मुहूर्त" : "Muhurta"} {nm(g.name)} · {nm(g.rashi)} · {g.house} · D9 {nm(g.d9)}</li>
+            ))}
+          </ul>
+        </details>
       </div>
-      {result.sutra.blocks.length ? (
-        <p className="mt-2 text-sm text-bad">
-          {lang === "hi" ? "बंद" : "Closed"}: {result.sutra.blocks.join(" · ")}
-        </p>
-      ) : null}
-      {result.sutra.cautions.length ? (
-        <p className="mt-1 text-sm text-warn">Caution: {result.sutra.cautions.join(" · ")}</p>
-      ) : null}
-      {result.sutra.supports.length ? (
-        <p className="mt-1 text-sm text-good">With you: {result.sutra.supports.slice(0, 4).join(" · ")}</p>
-      ) : null}
-      <div className="mt-3 space-y-1.5">
-        {parts.map(([name, score, weight]) => (
-          <div key={name} className="grid grid-cols-[minmax(0,6.2rem)_minmax(0,1fr)_2.2rem] items-center gap-2 text-xs">
-            <span className="text-muted">
-              {name} <span className="opacity-70">{weight}</span>
-            </span>
-            <span className="h-1.5 overflow-hidden rounded-full bg-surface-2">
-              <span className="block h-full bg-accent" style={{ width: `${score}%` }} />
-            </span>
-            <span className="text-right tabular-nums">{score}</span>
-          </div>
-        ))}
-      </div>
-      <div className="mt-3 flex flex-wrap gap-2">
-        {p.golden.amritSiddhi ? <Badge tone="good">Amrit Siddhi</Badge> : null}
-        {p.golden.sarvarthaSiddhi ? <Badge tone="good">Sarvartha Siddhi</Badge> : null}
-        <Badge tone="neutral">
-          {result.dasha.maha} / {result.dasha.antar}
-        </Badge>
-      </div>
-      <p className="mt-3 text-xs leading-relaxed text-muted">
-        {lang === "hi" ? "आधार" : "Basis"}: {lang === "hi" ? "दशा" : "Dasha"} {result.dasha.maha}/{result.dasha.antar}
-        {" · "}
-        {lang === "hi" ? "गोचर" : "Gochar"}{" "}
-        {result.gochar.hits.slice(0, 3).map((h) => `${h.planet} ${h.house}`).join(", ")}
-        {result.gochar.sadeSati ? (lang === "hi" ? " · साढ़े साती" : " · Sade Sati") : ""}
-        {" · "}
-        {lang === "hi" ? "नक्षत्र पद" : "Star pada"} {p.nakshatra.pada}
-      </p>
-      <ul className="mt-2 space-y-0.5 text-sm text-muted">
-        {result.reasons.slice(0, 12).map((x) => (
-          <li key={x}>{x}</li>
-        ))}
-      </ul>
-    </Card>
+    </article>
   );
 }

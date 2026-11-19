@@ -188,7 +188,54 @@ export function planetSidereal(name: string, jd: number): number {
   return sidereal(trop, jd);
 }
 
-/** Approximate local sunrise/sunset for a city (upper limb, refraction). */
+/** Mean lunar ascending node, tropical degrees. Meeus ch. 47. Not used for charts. */
+export function meanNodeLongitude(jd: number): number {
+  const T = (jd - 2451545.0) / 36525;
+  const T2 = T * T;
+  const T3 = T2 * T;
+  const T4 = T3 * T;
+  return norm360(125.0445479 - 1934.1362891 * T + 0.0020754 * T2 + T3 / 467441 - T4 / 60616000);
+}
+
+/**
+ * True (osculating) lunar ascending node, tropical degrees.
+ * Mean node plus the principal periodic terms (Meeus). TaraNidhi always uses this, never the mean node.
+ * Ketu is this longitude plus 180°.
+ */
+export function trueNodeLongitude(jd: number): number {
+  const T = (jd - 2451545.0) / 36525;
+  const T2 = T * T;
+  const T3 = T2 * T;
+  const T4 = T3 * T;
+  const rad = Math.PI / 180;
+  const D = (297.8501921 + 445267.1114034 * T - 0.0018819 * T2 + T3 / 545868 - T4 / 113065000) * rad;
+  const M = (357.5291092 + 35999.0502909 * T - 0.0001536 * T2 + T3 / 24490000) * rad;
+  const Mp = (134.9633964 + 477198.8675055 * T + 0.0087414 * T2 + T3 / 69699 - T4 / 14712000) * rad;
+  const F = (93.272095 + 483202.0175233 * T - 0.0036539 * T2 - T3 / 3526000 + T4 / 863310000) * rad;
+  const corr =
+    -1.4979 * Math.sin(2 * (D - F)) -
+    0.15 * Math.sin(M) -
+    0.1226 * Math.sin(2 * D) +
+    0.1176 * Math.sin(2 * F) -
+    0.0801 * Math.sin(2 * (Mp - F)) +
+    0.0943 * Math.sin(2 * (D + F)) +
+    0.0582 * Math.sin(2 * D - Mp) -
+    0.0539 * Math.sin(Mp - 2 * F) -
+    0.0458 * Math.sin(2 * D - M) +
+    0.0327 * Math.sin(2 * D + Mp) -
+    0.0304 * Math.sin(Mp + 2 * F) -
+    0.0173 * Math.sin(2 * (D - Mp)) -
+    0.0168 * Math.sin(M + 2 * F) +
+    0.0119 * Math.sin(Mp) +
+    0.0107 * Math.sin(M - 2 * F) -
+    0.0102 * Math.sin(2 * D + M) -
+    0.0081 * Math.sin(2 * Mp);
+  return norm360(meanNodeLongitude(jd) + corr);
+}
+
+export function trueNodeSidereal(jd: number): number {
+  return sidereal(trueNodeLongitude(jd), jd);
+}
 export function sunRiseSet(
   dateLocal: Date,
   lat: number,

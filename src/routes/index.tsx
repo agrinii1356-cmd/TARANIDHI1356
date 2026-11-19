@@ -5,6 +5,7 @@ import { Card } from "@/components/ui/card";
 import { formatTime, qualityTone } from "@/lib/format";
 import { dashaFor, getPanchang } from "@/lib/panchang/engine";
 import { chartFromProfile, useProfile } from "@/lib/panchang/store";
+import { useEventPlace } from "@/lib/panchang/here";
 import { dayScore, scoreMuhurat } from "@/lib/panchang/scoring";
 import { useWallet } from "@/lib/panchang/wallet";
 import { getActivity } from "@/lib/panchang/activities";
@@ -33,6 +34,7 @@ const MAJOR = [
 
 function Home() {
   const profile = useProfile((s) => s.profile);
+  const here = useEventPlace(profile);
   const credits = useWallet((s) => s.credits);
   const { lang, t } = useT();
   const nm = (name: string) => localName(name, lang);
@@ -43,8 +45,11 @@ function Home() {
   const noon = new Date();
   noon.setHours(12, 0, 0, 0);
   const chart = chartFromProfile(profile);
-  const p = getPanchang(now, profile.lat, profile.lon, profile.tz);
-  const day = dayScore(noon, chart, profile.lat, profile.lon, profile.tz);
+  const lat = here?.lat ?? profile.lat;
+  const lon = here?.lon ?? profile.lon;
+  const tz = here?.tz ?? profile.tz;
+  const p = getPanchang(now, lat, lon, tz);
+  const day = dayScore(noon, chart, lat, lon, tz);
   const dasha = dashaFor(chart, now);
 
   const windows = [
@@ -54,7 +59,7 @@ function Home() {
   ].map((w) => {
     const dt = new Date(now);
     dt.setMinutes(0, 0, 0);
-    const scored = scoreMuhurat(dt, w.key, chart, profile.lat, profile.lon, profile.tz);
+    const scored = scoreMuhurat(dt, w.key, chart, lat, lon, tz);
     return { ...w, scored };
   });
 
@@ -68,6 +73,7 @@ function Home() {
               day: "numeric",
               month: "long",
             })}
+            {here ? ` · ${here.name}${here.region ? `, ${here.region}` : ""}` : ""}
           </p>
           <h1 className="mt-1 font-display text-3xl">Namaste, {profile.name}</h1>
         </div>

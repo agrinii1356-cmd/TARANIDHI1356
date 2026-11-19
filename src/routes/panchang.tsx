@@ -17,12 +17,14 @@ import { limbEffect } from "@/lib/panchang/effects";
 import { localMonth, localName } from "@/lib/panchang/names";
 import { dayMarks } from "@/lib/panchang/sutra";
 import { chartFromProfile, useProfile } from "@/lib/panchang/store";
+import { useEventPlace } from "@/lib/panchang/here";
 import { useT } from "@/lib/prefs";
 
 export const Route = createFileRoute("/panchang")({ component: PanchangPage });
 
 function PanchangPage() {
   const profile = useProfile((s) => s.profile);
+  const here = useEventPlace(profile);
   const { lang } = useT();
   const [date, setDate] = useState(todayISODate());
   const [tab, setTab] = useState<LimbTab>("Tithi");
@@ -32,17 +34,20 @@ function PanchangPage() {
   const data = useMemo(() => {
     if (!profile) return null;
     const local = new Date(date + "T12:00:00");
-    const p = getPanchang(local, profile.lat, profile.lon, profile.tz);
-    const span = dayLimbs(local, profile.lat, profile.lon, profile.tz);
+    const lat = here?.lat ?? profile.lat;
+    const lon = here?.lon ?? profile.lon;
+    const tz = here?.tz ?? profile.tz;
+    const p = getPanchang(local, lat, lon, tz);
+    const span = dayLimbs(local, lat, lon, tz);
     const horas = dayHoras(span.sunrise, span.nextSunrise, p.vara.name);
     const marks = dayMarks(span.sunrise, p.sunset, new Date(span.sunrise).getDay());
-    const place = placeDay(local, profile.lat, profile.lon, profile.tz);
+    const place = placeDay(local, lat, lon, tz);
     const chart = chartFromProfile(profile);
     const tara = calculateTaraBala(chart.janmaNakshatra.index, p.nakshatra.index);
     const chandra = calculateChandraBala(chart.janmaRashi.index, p.moonRashi.index);
     const dasha = dashaFor(chart, local);
     return { p, tara, chandra, chart, dasha, span, horas, marks, place };
-  }, [date, profile]);
+  }, [date, profile, here]);
 
   if (!profile || !data) return null;
   const { p, tara, chandra, dasha, span, horas, marks, place } = data;
@@ -55,7 +60,7 @@ function PanchangPage() {
         <div>
           <h1 className="font-display text-3xl">{tx("Daily panchang", "आज का पंचांग")}</h1>
           <p className="mt-1 text-sm text-muted">
-            {profile.city} · {place.tithiDay} {localMonth(place.month, lang)} · {nm(place.paksha)} {nm(place.tithiName)}
+            {(here?.name || profile.city)}{here?.region ? ` · ${here.region}` : ""} · {place.tithiDay} {localMonth(place.month, lang)} · {nm(place.paksha)} {nm(place.tithiName)}
           </p>
         </div>
         <input
@@ -65,6 +70,33 @@ function PanchangPage() {
           className="h-11 rounded-md border border-line bg-surface px-3"
         />
       </div>
+
+      <Card>
+        <h2 className="font-display text-2xl">{tx("The day", "यह दिन")}</h2>
+        <dl className="mt-3 divide-y divide-line text-base">
+          <Row k={tx("Sunrise", "सूर्योदय")} v={formatTime(p.sunrise)} />
+          <Row k={tx("Sunset", "सूर्यास्त")} v={formatTime(p.sunset)} />
+          <Row k={tx("Weekday", "वार")} v={nm(p.vara.name)} />
+          <Row k={tx("Paksha", "पक्ष")} v={nm(p.tithi.paksha)} />
+          <Row k={tx("Moon sign", "चंद्र राशि")} v={nm(p.moonRashi.name)} />
+          <Row k={tx("Sun sign", "सूर्य राशि")} v={nm(p.sunRashi.name)} />
+          <Row k={tx("Abhijit", "अभिजित")} v={`${formatTime(p.abhijit.start)} – ${formatTime(p.abhijit.end)}`} />
+          <Row k={tx("Rahu", "राहु काल")} v={`${formatTime(marks.rahu.from)} – ${formatTime(marks.rahu.until)}`} />
+          <Row k={tx("Yamaganda", "यमगंड")} v={`${formatTime(marks.yamaganda.from)} – ${formatTime(marks.yamaganda.until)}`} />
+          <Row k={tx("Gulika", "गुलिक")} v={`${formatTime(marks.gulika.from)} – ${formatTime(marks.gulika.until)}`} />
+          {span.limbs.map((limb) => {
+            const part = limb.parts[0];
+            if (!part) return null;
+            return (
+              <Row
+                key={limb.limb}
+                k={nm(limb.limb)}
+                v={`${nm(part.name)} · ${formatTime(part.from)} – ${formatTime(part.until)}`}
+              />
+            );
+          })}
+        </dl>
+      </Card>
 
       <Card>
         <h2 className="font-display text-xl">{tx("This place", "यह जगह")}</h2>
@@ -307,7 +339,7 @@ function PanchangPage() {
 
 function Row({ k, v }: { k: string; v: string }) {
   return (
-    <div className="flex min-w-0 justify-between gap-3 py-3 text-sm">
+    <div className="flex min-w-0 justify-between gap-3 py-3 text-base">
       <dt className="shrink-0 text-muted">{k}</dt>
       <dd className="min-w-0 text-right break-words">{v}</dd>
     </div>

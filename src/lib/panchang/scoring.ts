@@ -169,13 +169,12 @@ export function scoreMuhurat(
   const navtara = clamp(50 + tara.score * 1.6);
   const chandraS = clamp(50 + chandra.score * 2);
   const hora = horaBonus(p, act);
-  const birth = getPanchang(chart.birth, lat, lon, tz);
   const pakshi = panchpakshiAt(
     local,
     new Date(p.sunrise),
     new Date(p.sunset),
     chart.janmaNakshatra.index,
-    birth.tithi.paksha === "Shukla",
+    chart.birthShukla,
     p.tithi.paksha === "Shukla",
   );
   const gochar = gocharAt(local, tz, chart.janmaRashi.index);

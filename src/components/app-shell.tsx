@@ -1,6 +1,6 @@
 import { Link, useRouterState } from "@tanstack/react-router";
 import { Bird, CalendarDays, Compass, Home, Search, UserRound } from "lucide-react";
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { cn } from "@/lib/utils";
 import { planAccess, useBilling } from "@/lib/billing";
 import { useT } from "@/lib/prefs";
@@ -18,7 +18,8 @@ export function AppShell({ children }: { children: ReactNode }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const billing = useBilling();
   const access = planAccess(billing);
-  const { t } = useT();
+  const { t, lang } = useT();
+  const [help, setHelp] = useState(false);
   const chip = access.kind === "paid" ? t("pay") : access.kind === "demo" ? t("demo") : t("plans");
 
   const links = (mode: "side" | "top" | "bottom") =>
@@ -58,8 +59,13 @@ export function AppShell({ children }: { children: ReactNode }) {
   return (
     <div className="min-h-dvh bg-bg text-ink lg:grid lg:grid-cols-[220px_minmax(0,1fr)]">
       <aside className="hidden border-r border-line px-4 py-6 lg:flex lg:flex-col lg:gap-6">
-        <Link to="/" className="font-display text-2xl tracking-tight">
-          TaraNidhi
+        <Link to="/" className="flex items-center gap-2">
+          <img
+            src="/logo.png"
+            alt=""
+            className="h-16 w-16 rounded-full border border-[#d4b15a] object-cover object-[center_28%]"
+          />
+          <span className="font-display text-xl tracking-tight">TaraNidhi</span>
         </Link>
         <nav className="flex flex-col gap-1">{links("side")}</nav>
         <Link
@@ -71,6 +77,10 @@ export function AppShell({ children }: { children: ReactNode }) {
       </aside>
 
       <div className="min-w-0">
+        <header className="flex items-center gap-2 border-b border-line px-4 py-3 lg:hidden">
+          <img src="/logo.png" alt="" className="h-9 w-9 rounded-full object-cover object-[center_28%]" />
+          <span className="font-display text-lg">TaraNidhi</span>
+        </header>
         <header className="hidden items-center justify-end border-b border-line px-8 py-4 xl:flex">
           <span className="text-xs uppercase tracking-[0.16em] text-muted">TaraNidhi 2</span>
         </header>
@@ -82,6 +92,24 @@ export function AppShell({ children }: { children: ReactNode }) {
       <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-line bg-surface/95 pb-[env(safe-area-inset-bottom)] backdrop-blur lg:hidden">
         <div className="mx-auto grid w-full max-w-lg grid-cols-6">{links("bottom")}</div>
       </nav>
+      <button
+        type="button"
+        onClick={() => setHelp((v) => !v)}
+        className="fixed bottom-20 right-3 z-40 rounded-full bg-[#1c1408] px-4 py-2 text-sm text-[#ffe08a] lg:bottom-6"
+      >
+        {lang === "hi" ? "सहायता" : "Help"}
+      </button>
+      {help ? (
+        <div className="fixed bottom-32 right-3 z-40 w-[min(22rem,calc(100vw-1.5rem))] rounded-2xl border border-[#d4b15a] bg-[#070b18] p-4 text-sm leading-relaxed text-[#f6e7c1] lg:bottom-16">
+          <p className="font-display text-lg text-[#ffe08a]">TaraNidhi</p>
+          <ol className="mt-2 list-decimal space-y-2 pl-4">
+            <li>{lang === "hi" ? "निधि में जन्म तिथि, समय और शहर भरें।" : "In Nidhi, save birth date, time and city."}</li>
+            <li>{lang === "hi" ? "मुहूर्त में काम चुनें। तारीख उसी के नीचे है, सूची के बाद नहीं।" : "On Muhurat, pick the work. The dates sit under the category, not after the long list."}</li>
+            <li>{lang === "hi" ? "कैलेंडर की तारीख दबाने से वही दिन मुहूर्त में खुलता है।" : "Press a calendar date. That day opens in Muhurat."}</li>
+            <li>{lang === "hi" ? "भुगतान का UTR बैंक एसएमएस में है। ऐप बैंक से खुद पुष्टि नहीं पढ़ता।" : "The UTR is in the bank SMS. The app cannot read the bank."}</li>
+          </ol>
+        </div>
+      ) : null}
     </div>
   );
 }

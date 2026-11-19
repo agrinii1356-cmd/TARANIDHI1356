@@ -16,9 +16,10 @@ type Props = {
   value: Place | null;
   onChange: (place: Place) => void;
   id?: string;
+  label?: string;
 };
 
-export function PlacePicker({ value, onChange, id = "place" }: Props) {
+export function PlacePicker({ value, onChange, id = "place", label = "Birth place" }: Props) {
   const [query, setQuery] = useState(value ? value.name : "");
   const [open, setOpen] = useState(false);
   const [remote, setRemote] = useState<Place[]>([]);
@@ -100,7 +101,7 @@ export function PlacePicker({ value, onChange, id = "place" }: Props) {
 
   return (
     <div ref={boxRef} className="relative">
-      <Label htmlFor={id}>Birth place</Label>
+      <Label htmlFor={id}>{label}</Label>
       <div className="relative">
         <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-subtle" />
         <Input

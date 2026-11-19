@@ -123,6 +123,40 @@ function placeFromNominatim(hit: NominatimHit): Place {
   };
 }
 
+export const reversePlace = createServerFn({ method: "POST" })
+  .validator((data: { lat: number; lon: number }) => {
+    const lat = Number(data?.lat);
+    const lon = Number(data?.lon);
+    if (!Number.isFinite(lat) || !Number.isFinite(lon)) return { lat: 0, lon: 0 };
+    return { lat, lon };
+  })
+  .handler(async ({ data }): Promise<Place | null> => {
+    const url = new URL("https://photon.komoot.io/reverse");
+    url.searchParams.set("lat", String(data.lat));
+    url.searchParams.set("lon", String(data.lon));
+    const res = await fetch(url.toString(), { headers: { Accept: "application/json" } }).catch(() => null);
+    const json = res && res.ok ? ((await res.json()) as { features?: PhotonFeature[] }) : null;
+    const f = json?.features?.[0];
+    const props = f?.properties ?? {};
+    const name = props.name || props.city || props.town || props.village || props.county;
+    if (name) {
+      return {
+        name,
+        region: [props.state, props.country].filter(Boolean).join(", "),
+        lat: data.lat,
+        lon: data.lon,
+        tz: tzFromCoords(data.lat, data.lon, props.countrycode),
+      };
+    }
+    return {
+      name: "GPS",
+      region: "",
+      lat: data.lat,
+      lon: data.lon,
+      tz: tzFromCoords(data.lat, data.lon),
+    };
+  });
+
 export const searchPlacesRemote = createServerFn({ method: "POST" })
   .validator((data: { q: string }) => {
     const q = String(data?.q ?? "").trim().slice(0, 80);
