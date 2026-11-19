@@ -3,6 +3,8 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { ACTIVITIES, CATEGORIES } from "@/lib/panchang/activities";
 import { formatOffset } from "@/lib/panchang/cities";
 import { dashaFor } from "@/lib/panchang/engine";
+import { navamsaSign } from "@/lib/panchang/gates";
+import { RASHIS } from "@/lib/panchang/constants";
 import { chartFromProfile, useProfile, type Profile } from "@/lib/panchang/store";
 import {
   MAX_PROFILES,
@@ -216,6 +218,22 @@ function ProfilePage() {
         ) : null}
       </Card>
 
+      <Card>
+        <h2 className="font-display text-xl">{lang === "hi" ? "D9 ग्रह स्थिति" : "D9 planet positions"}</h2>
+        <p className="mt-1 text-sm text-muted">
+          D9 {lang === "hi" ? "लग्न" : "lagna"} {RASHIS[navamsaSign(chart.lagnaIndex * 30 + 15)]}
+        </p>
+        <ul className="mt-3 space-y-1 text-sm">
+          {chart.grahas.map((g) => (
+            <li key={g.name} className="flex justify-between gap-3">
+              <span>{g.name}</span>
+              <span className="text-muted">
+                {g.rashi} p{g.pada} → D9 {RASHIS[navamsaSign(g.lon)]}
+              </span>
+            </li>
+          ))}
+        </ul>
+      </Card>
       <Card>
         <h2 className="font-display text-xl">{t("method")}</h2>
         <p className="mt-3 text-sm leading-relaxed text-muted">

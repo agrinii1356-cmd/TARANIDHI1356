@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PanchangPro — Personalized Muhurat</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            primary: { 900: '#1e1b4b', 800: '#312e81', 700: '#4338ca', 600: '#4f46e5' },
+            accent: { 400: '#fbbf24', 500: '#f59e0b' }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&family=Noto+Sans+Devanagari:wght@400;600&display=swap');
+    body { font-family: 'Poppins', 'Noto Sans Devanagari', sans-serif; }
+    .gradient-bg { background: linear-gradient(135deg, #1e1b4b 0%, #312e81 50%, #4c1d95 100%); }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-800">
+  <header class="gradient-bg text-white sticky top-0 z-50 shadow-lg">
+    <div class="max-w-6xl mx-auto px-4 py-4 flex justify-between items-center">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-full bg-amber-400 flex items-center justify-center text-indigo-900 font-bold text-lg">P</div>
+        <div>
+          <h1 class="text-xl font-bold leading-tight">PanchangPro</h1>
+          <p class="text-indigo-200 text-xs">Your Birth. Your Time. Your Success.</p>
+        </div>
+      </div>
+      <nav class="hidden md:flex space-x-6 text-sm font-medium">
+        <a href="#home" class="hover:text-amber-300 transition">Home</a>
+        <a href="#muhurat" class="hover:text-amber-300 transition">Muhurat</a>
+        <a href="#panchang" class="hover:text-amber-300 transition">Daily Panchang</a>
+        <a href="#how" class="hover:text-amber-300 transition">How it Works</a>
+      </nav>
+    </div>
+  </header>
+
+  <!-- Hero -->
+  <section id="home" class="gradient-bg text-white py-20">
+    <div class="max-w-4xl mx-auto px-4 text-center">
+      <h2 class="text-4xl md:text-5xl font-bold mb-5 leading-tight">
+        व्यक्तिगत पंचांग<br/>
+        <span class="text-amber-400">आधुनिक जीवन</span> के लिए
+      </h2>
+      <p class="text-indigo-200 text-lg mb-8 max-w-2xl mx-auto">
+        जन्म तिथि के आधार पर सटीक मुहूर्त — जॉब इंटरव्यू, बिजनेस डील, ट्रैवल, हेल्थ, रिलेशनशिप और जीवन के हर फैसले के लिए
+      </p>
+      <div class="flex flex-col sm:flex-row gap-4 justify-center">
+        <button onclick="document.getElementById('muhurat').scrollIntoView({behavior:'smooth'})"
+                class="bg-amber-400 text-indigo-900 font-semibold px-8 py-3.5 rounded-full hover:bg-amber-300 transition shadow-lg">
+          मुहूर्त खोजें →
+        </button>
+        <button onclick="document.getElementById('panchang').scrollIntoView({behavior:'smooth'})"
+                class="border-2 border-indigo-300 text-white font-medium px-8 py-3.5 rounded-full hover:bg-white/10 transition">
+          आज का पंचांग
+        </button>
+      </div>
+    </div>
+  </section>
+
+  <!-- Features -->
+  <section class="py-14 bg-white">
+    <div class="max-w-6xl mx-auto px-4 grid md:grid-cols-3 gap-8">
+      <div class="text-center p-6 rounded-2xl bg-indigo-50">
+        <div class="text-4xl mb-3">🎂</div>
+        <h3 class="font-bold text-lg text-indigo-900 mb-2">DOB आधारित</h3>
+        <p class="text-slate-600 text-sm">जनम नक्षत्र, राशि और तारा बल से व्यक्तिगत मुहूर्त</p>
+      </div>
+      <div class="text-center p-6 rounded-2xl bg-amber-50">
+        <div class="text-4xl mb-3">🎯</div>
+        <h3 class="font-bold text-lg text-indigo-900 mb-2">Intent Search</h3>
+        <p class="text-slate-600 text-sm">“मैं जॉब इंटरव्यू करना चाहता हूँ” → बेस्ट टाइम</p>
+      </div>
+      <div class="text-center p-6 rounded-2xl bg-emerald-50">
+        <div class="text-4xl mb-3">📊</div>
+        <h3 class="font-bold text-lg text-indigo-900 mb-2">0-100 स्कोर</h3>
+        <p class="text-slate-600 text-sm">पंचांग + तारा + चंद्र + लग्न + दशा का संयुक्त स्कोर</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Muhurat Search -->
+  <section id="muhurat" class="py-16 max-w-4xl mx-auto px-4">
+    <h3 class="text-3xl font-bold text-center mb-2 text-indigo-900">मुहूर्त खोजें</h3>
+    <p class="text-center text-slate-500 mb-8">अपनी जन्म तिथि और गतिविधि चुनें</p>
+
+    <div class="bg-white rounded-2xl shadow-xl p-6 md:p-8 space-y-5 border border-slate-100">
+      <div class="grid md:grid-cols-2 gap-4">
+        <div>
+          <label class="block text-sm font-medium mb-1.5 text-slate-700">गतिविधि</label>
+          <select id="activity" class="w-full border border-slate-300 rounded-xl px-4 py-2.5 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none">
+            <option value="job_interview">नौकरी का इंटरव्यू</option>
+            <option value="business_deal">व्यापारिक सौदा</option>
+            <option value="corporate_meeting">कॉर्पोरेट मीटिंग / ज़ूम</option>
+            <option value="marketing_call">मार्केटिंग कॉल</option>
+            <option value="financial_transaction">वित्तीय लेन-देन</option>
+            <option value="loan_application">लोन आवेदन</option>
+            <option value="doctor_appointment">डॉक्टर अपॉइंटमेंट</option>
+            <option value="travel_booking">यात्रा बुकिंग</option>
+            <option value="start_journey">यात्रा शुरू</option>
+            <option value="vehicle_purchase">गाड़ी खरीदना</option>
+            <option value="property_purchase">प्रॉपर्टी खरीदना</option>
+            <option value="engagement">सगाई</option>
+            <option value="dating">डेटिंग</option>
+            <option value="marriage">विवाह</option>
+            <option value="child_birth_planning">बच्चे का जन्म समय</option>
+            <option value="education_start">शिक्षा शुरू</option>
+            <option value="exam">परीक्षा</option>
+            <option value="court_case">कोर्ट केस</option>
+            <option value="new_project_launch">प्रोजेक्ट लॉन्च</option>
+            <option value="website_launch">ऐप / वेबसाइट लॉन्च</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-sm font-medium mb-1.5 text-slate-700">जन्म तिथि</label>
+          <input type="date" id="dob" class="w-full border border-slate-300 rounded-xl px-4 py-2.5 focus:ring-2 focus:ring-indigo-500 outline-none" value="1990-05-15">
+        </div>
+      </div>
+
+      <div class="grid md:grid-cols-3 gap-4">
+        <div>
+          <label class="block text-sm font-medium mb-1.5 text-slate-700">जन्म समय</label>
+          <input type="time" id="tob" class="w-full border border-slate-300 rounded-xl px-4 py-2.5 focus:ring-2 focus:ring-indigo-500 outline-none" value="10:30">
+        </div>
+        <div>
+          <label class="block text-sm font-medium mb-1.5 text-slate-700">शुरू तारीख</label>
+          <input type="date" id="start" class="w-full border border-slate-300 rounded-xl px-4 py-2.5 focus:ring-2 focus:ring-indigo-500 outline-none">
+        </div>
+        <div>
+          <label class="block text-sm font-medium mb-1.5 text-slate-700">अंत तारीख</label>
+          <input type="date" id="end" class="w-full border border-slate-300 rounded-xl px-4 py-2.5 focus:ring-2 focus:ring-indigo-500 outline-none">
+        </div>
+      </div>
+
+      <button onclick="searchMuhurat()"
+              class="w-full bg-indigo-700 text-white font-semibold py-3.5 rounded-xl hover:bg-indigo-800 transition shadow-md">
+        सर्वश्रेष्ठ मुहूर्त खोजें
+      </button>
+    </div>
+
+    <div id="results" class="mt-10 space-y-4 hidden"></div>
+  </section>
+
+  <!-- Daily Panchang -->
+  <section id="panchang" class="py-16 bg-indigo-50">
+    <div class="max-w-4xl mx-auto px-4">
+      <h3 class="text-3xl font-bold text-center mb-8 text-indigo-900">आज का पंचांग</h3>
+      <div id="dailyPanchang" class="bg-white rounded-2xl shadow-lg p-6 grid grid-cols-2 md:grid-cols-3 gap-4 text-center">
+        <div class="p-4 rounded-xl bg-slate-50"><div class="text-xs text-slate-500 uppercase tracking-wide">तिथि</div><div class="font-semibold text-lg mt-1" id="tithi">—</div></div>
+        <div class="p-4 rounded-xl bg-slate-50"><div class="text-xs text-slate-500 uppercase tracking-wide">नक्षत्र</div><div class="font-semibold text-lg mt-1" id="nakshatra">—</div></div>
+        <div class="p-4 rounded-xl bg-slate-50"><div class="text-xs text-slate-500 uppercase tracking-wide">वार</div><div class="font-semibold text-lg mt-1" id="vara">—</div></div>
+        <div class="p-4 rounded-xl bg-slate-50"><div class="text-xs text-slate-500 uppercase tracking-wide">योग</div><div class="font-semibold text-lg mt-1" id="yoga">—</div></div>
+        <div class="p-4 rounded-xl bg-slate-50"><div class="text-xs text-slate-500 uppercase tracking-wide">करण</div><div class="font-semibold text-lg mt-1" id="karana">—</div></div>
+        <div class="p-4 rounded-xl bg-slate-50"><div class="text-xs text-slate-500 uppercase tracking-wide">चंद्र राशि</div><div class="font-semibold text-lg mt-1" id="rashi">—</div></div>
+      </div>
+      <p class="text-center text-sm text-slate-500 mt-4">* डेमो — Backend API चलाने पर असली डेटा दिखेगा</p>
+    </div>
+  </section>
+
+  <!-- How it works -->
+  <section id="how" class="py-16 max-w-4xl mx-auto px-4">
+    <h3 class="text-3xl font-bold text-center mb-10 text-indigo-900">यह कैसे काम करता है?</h3>
+    <div class="space-y-6">
+      <div class="flex gap-4 items-start">
+        <div class="w-10 h-10 rounded-full bg-indigo-700 text-white flex items-center justify-center font-bold flex-shrink-0">1</div>
+        <div>
+          <h4 class="font-semibold text-lg">जन्म विवरण दें</h4>
+          <p class="text-slate-600 text-sm">तिथि, समय और जन्म स्थान से आपकी जन्म कुंडली (नक्षत्र + राशि) बनती है।</p>
+        </div>
+      </div>
+      <div class="flex gap-4 items-start">
+        <div class="w-10 h-10 rounded-full bg-indigo-700 text-white flex items-center justify-center font-bold flex-shrink-0">2</div>
+        <div>
+          <h4 class="font-semibold text-lg">गतिविधि चुनें</h4>
+          <p class="text-slate-600 text-sm">जॉब, बिजनेस, ट्रैवल, हेल्थ आदि — हर गतिविधि के अपने नियम (वार, नक्षत्र, तिथि)।</p>
+        </div>
+      </div>
+      <div class="flex gap-4 items-start">
+        <div class="w-10 h-10 rounded-full bg-indigo-700 text-white flex items-center justify-center font-bold flex-shrink-0">3</div>
+        <div>
+          <h4 class="font-semibold text-lg">व्यक्तिगत स्कोर</h4>
+          <p class="text-slate-600 text-sm">पंचांग शुद्धता + तारा बल + चंद्र बल + लग्न + दशा → 0-100 स्कोर और बेस्ट विंडो।</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <footer class="bg-indigo-950 text-indigo-200 py-10 text-center text-sm">
+    <p class="font-medium text-white mb-1">PanchangPro</p>
+    <p>© 2026 — Personalized Vedic Timing Engine</p>
+    <p class="mt-2 text-indigo-400">Backend: FastAPI · Frontend: Tailwind · Engine: Vedic Panchanga</p>
+  </footer>
+
+  <script>
+    const API_BASE = 'http://localhost:8000/api/v1';
+
+    // Default dates
+    const today = new Date();
+    document.getElementById('start').value = today.toISOString().slice(0,10);
+    const endD = new Date(today); endD.setDate(endD.getDate() + 14);
+    document.getElementById('end').value = endD.toISOString().slice(0,10);
+
+    // Demo daily values
+    document.getElementById('tithi').textContent = 'Dashami (Shukla)';
+    document.getElementById('nakshatra').textContent = 'Hasta (Pada 2)';
+    document.getElementById('vara').textContent = 'Saturday';
+    document.getElementById('yoga').textContent = 'Siddhi';
+    document.getElementById('karana').textContent = 'Taitila';
+    document.getElementById('rashi').textContent = 'Kanya';
+
+    async function searchMuhurat() {
+      const activity = document.getElementById('activity').value;
+      const dob = document.getElementById('dob').value;
+      const tob = document.getElementById('tob').value;
+      const start = document.getElementById('start').value;
+      const end = document.getElementById('end').value;
+
+      const resultsDiv = document.getElementById('results');
+      resultsDiv.innerHTML = '<div class="text-center py-8 text-indigo-600 font-medium">खोज रहे हैं...</div>';
+      resultsDiv.classList.remove('hidden');
+
+      const [year, month, day] = dob.split('-').map(Number);
+      const [hour, minute] = tob.split(':').map(Number);
+
+      const payload = {
+        activity,
+        start_date: start,
+        end_date: end,
+        max_results: 8,
+        min_score: 50,
+        birth: { year, month, day, hour, minute, lat: 28.6139, lon: 77.2090, tz_offset: 5.5 }
+      };
+
+      try {
+        const res = await fetch(`${API_BASE}/muhurat/search`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        if (!res.ok) throw new Error('API error');
+        const data = await res.json();
+        renderResults(data);
+      } catch (e) {
+        // Fallback demo results when API is not running
+        renderDemoResults(activity);
+      }
+    }
+
+    function renderResults(data) {
+      const resultsDiv = document.getElementById('results');
+      if (!data.results || data.results.length === 0) {
+        resultsDiv.innerHTML = '<p class="text-center text-slate-500">कोई उपयुक्त मुहूर्त नहीं मिला। तारीख रेंज बढ़ाएँ।</p>';
+        return;
+      }
+      let html = `<h4 class="text-xl font-semibold mb-1">${data.activity}</h4>
+        <p class="text-sm text-slate-500 mb-5">जन्म नक्षत्र: ${data.birth_nakshatra} · ${data.total_found} परिणाम</p>`;
+      data.results.forEach(r => {
+        const colorMap = { green: 'bg-green-50 border-green-200', lightgreen: 'bg-emerald-50 border-emerald-200', yellow: 'bg-amber-50 border-amber-200', red: 'bg-red-50 border-red-200' };
+        const badgeMap = { green: 'bg-green-500', lightgreen: 'bg-emerald-500', yellow: 'bg-amber-500', red: 'bg-red-500' };
+        html += `
+          <div class="${colorMap[r.color] || 'bg-slate-50'} border rounded-xl p-5 mb-3">
+            <div class="flex justify-between items-start">
+              <div>
+                <div class="font-bold text-lg">${r.quality} — ${r.final_score}</div>
+                <div class="text-slate-600 mt-1">${new Date(r.datetime).toLocaleString('hi-IN', {dateStyle:'medium', timeStyle:'short'})}</div>
+                <div class="text-sm text-slate-500 mt-2">${r.panchang_summary.tithi} · ${r.panchang_summary.nakshatra} · ${r.panchang_summary.vara}</div>
+                <div class="text-sm mt-2 space-y-0.5">${r.reasons.map(x => '• ' + x).join('<br>')}</div>
+              </div>
+              <span class="${badgeMap[r.color] || 'bg-slate-500'} text-white text-xs px-3 py-1 rounded-full">${r.recommendation}</span>
+            </div>
+          </div>`;
+      });
+      resultsDiv.innerHTML = html;
+    }
+
+    function renderDemoResults(activity) {
+      const resultsDiv = document.getElementById('results');
+      resultsDiv.innerHTML = `
+        <h4 class="text-xl font-semibold mb-4">सैंपल रिजल्ट (API बंद होने पर)</h4>
+        <div class="bg-green-50 border border-green-200 rounded-xl p-5 mb-3">
+          <div class="flex justify-between">
+            <div>
+              <div class="font-bold text-lg text-green-800">Excellent — 84.2</div>
+              <div class="text-slate-600 mt-1">8 अक्टूबर 2026 · 11:00 पूर्वाह्न</div>
+              <div class="text-sm text-slate-500 mt-2">Dashami · Pushya · Thursday</div>
+              <div class="text-sm text-green-700 mt-2">✓ Tara Bala: Sampat<br>✓ Chandra Bala strong<br>✓ Favourable weekday</div>
+            </div>
+            <span class="bg-green-500 text-white text-xs px-3 py-1 rounded-full h-fit">Recommended</span>
+          </div>
+        </div>
+        <div class="bg-emerald-50 border border-emerald-200 rounded-xl p-5 mb-3">
+          <div class="flex justify-between">
+            <div>
+              <div class="font-bold text-lg text-emerald-800">Good — 72.5</div>
+              <div class="text-slate-600 mt-1">10 अक्टूबर 2026 · 02:00 अपराह्न</div>
+              <div class="text-sm text-slate-500 mt-2">Dwadashi · Hasta · Saturday</div>
+            </div>
+            <span class="bg-emerald-500 text-white text-xs px-3 py-1 rounded-full h-fit">Good</span>
+          </div>
+        </div>
+        <p class="text-center text-sm text-slate-500 mt-4">Backend चलाने के लिए: <code class="bg-slate-100 px-2 py-0.5 rounded">cd backend && uvicorn main:app --reload</code></p>
+      `;
+    }
+
+    // Try load real daily panchang
+    async function loadDaily() {
+      try {
+        const d = new Date().toISOString().slice(0,10);
+        const res = await fetch(`${API_BASE}/panchang/daily?date=${d}`);
+        if (!res.ok) return;
+        const p = await res.json();
+        document.getElementById('tithi').textContent = `${p.tithi.name} (${p.tithi.paksha})`;
+        document.getElementById('nakshatra').textContent = `${p.nakshatra.name} (Pada ${p.nakshatra.pada})`;
+        document.getElementById('vara').textContent = p.vara.name;
+        document.getElementById('yoga').textContent = p.yoga.name;
+        document.getElementById('karana').textContent = p.karana.name;
+        document.getElementById('rashi').textContent = p.moon_rashi.name;
+      } catch (e) {}
+    }
+    loadDaily();
+  </script>
+</body>
+</html>

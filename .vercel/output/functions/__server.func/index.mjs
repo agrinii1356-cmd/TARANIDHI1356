@@ -13,6 +13,7 @@ var install_page_default = "<!DOCTYPE html>\n<html lang=\"en\" class=\"device-de
 //#region \0virtual:grok-og-identity
 var grokOgIdentity = { "site": {
 	"title": "TaraNidhi",
+	"type": "x:game",
 	"card": "custom",
 	"color": "8B3A2A",
 	"image": "/og.jpg",

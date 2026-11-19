@@ -4,12 +4,18 @@ import {
   calculateChandraBala,
   calculateTaraBala,
   dashaFor,
+  getBirthChart,
   getPanchang,
   type BirthChart,
+  type NatalGraha,
 } from "./engine";
+import { navamsaSign } from "./gates";
+import { RASHIS } from "./constants";
+import { ascendantSidereal } from "./astronomy";
 import type { DashaSlice } from "./dasha";
 import { gocharAt, panchpakshiAt, type GocharReading, type PakshiReading } from "./influences";
 import { readSutras, type SutraReading } from "./sutra";
+import { extraGates } from "./gates";
 
 export type Quality = "Excellent" | "Good" | "Average" | "Avoid";
 
@@ -39,6 +45,19 @@ export type ScoreResult = {
   reasons: string[];
   recommendation: string;
   navtaraFlag: "priority" | "alert" | "plain";
+  muhurta: {
+    lagna: string;
+    lagnaD9: string;
+    place: string;
+    grahas: { name: string; rashi: string; house: number; d9: string; digbal: boolean }[];
+  };
+  birth: {
+    lagna: string;
+    nakshatra: string;
+    rashi: string;
+    grahas: { name: string; rashi: string; house: number; d9: string; digbal: boolean }[];
+  };
+  weights: { panch: number; navtara: number; chandra: number; hora: number; pakshi: number; gochar: number; dasha: number; golden: number };
 };
 
 function clamp(n: number, a = 0, b = 100) {
@@ -161,26 +180,65 @@ export function scoreMuhurat(
   );
   const gochar = gocharAt(local, tz, chart.janmaRashi.index);
   const rawSutra = readSutras(p, local, lat, lon, tz, chart);
+  const extra = extraGates(local, lat, lon, tz, chart, p, act.key, act.tier, tara.number, tara.avritti);
+  rawSutra.blocks.push(...extra.blocks);
+  rawSutra.cautions.push(...extra.cautions);
+  rawSutra.supports.push(...extra.supports);
   const sutra: SutraReading =
     act.tier === "major"
       ? { ...rawSutra, blocks: [...rawSutra.blocks, ...rawSutra.cautions], cautions: [] }
       : rawSutra;
   const dasha = dashaFor(chart, local);
   const dashaS = dashaBonus(dasha, act, chart);
+  const mChart = getBirthChart(local, lat, lon, tz);
+  const mLagnaLon = ascendantSidereal(local, lat, lon, tz);
+  const mD9 = navamsaSign(mLagnaLon);
+  const muhurta = {
+    lagna: mChart.lagna,
+    lagnaD9: RASHIS[mD9],
+    place: `${lat.toFixed(2)}, ${lon.toFixed(2)}`,
+    grahas: mChart.grahas.map((g: NatalGraha) => ({
+      name: g.name,
+      rashi: g.rashi,
+      house: g.houseFromLagna,
+      d9: RASHIS[navamsaSign(g.lon)],
+      digbal: g.digbal,
+    })),
+  };
   const golden = goldenScore(p);
+  const trad = act.paddhati === "traditional";
+  // Traditional: panchang first. Advance: birth chart first.
+  const w = trad
+    ? { panch: 0.4, navtara: 0.1, chandra: 0.06, hora: 0.14, pakshi: 0.06, gochar: 0.06, dasha: 0.06, golden: 0.12 }
+    : { panch: 0.2, navtara: 0.16, chandra: 0.1, hora: 0.1, pakshi: 0.1, gochar: 0.14, dasha: 0.14, golden: 0.06 };
+  const d9Nudge = 0;
+  const natalD9 = navamsaSign(chart.lagnaIndex * 30 + 15);
+  const d9From = ((mD9 - natalD9 + 12) % 12) + 1;
+  const d9Adj = [1, 5, 9, 11].includes(d9From) ? 4 : [6, 8, 12].includes(d9From) ? -4 : 0;
   const final = clamp(
-    panch * 0.26 +
-      navtara * 0.14 +
-      chandraS * 0.08 +
-      hora * 0.12 +
-      pakshi.score * 0.12 +
-      gochar.score * 0.12 +
-      dashaS * 0.1 +
-      golden * 0.06,
+    panch * w.panch +
+      navtara * w.navtara +
+      chandraS * w.chandra +
+      hora * w.hora +
+      pakshi.score * w.pakshi +
+      gochar.score * w.gochar +
+      dashaS * w.dasha +
+      golden * w.golden +
+      d9Adj,
   );
   const quality = qualityOf(final);
 
   const reasons: string[] = [];
+  if ([1, 5, 9, 11].includes(d9From)) reasons.push(`Muhurta D9 lagna is ${d9From} from natal D9 — supports.`);
+  if ([6, 8, 12].includes(d9From)) reasons.push(`Muhurta D9 lagna is ${d9From} from natal D9 — weak.`);
+  reasons.push(
+    `Muhurta lagna ${mChart.lagna} at ${lat.toFixed(2)},${lon.toFixed(2)}. Navamsa lagna ${RASHIS[mD9]}.`,
+  );
+  reasons.push(
+    trad
+      ? "Paddhati: Traditional. Panchang 40%, golden 12%, hora 14%. Birth chart is secondary."
+      : "Paddhati: Advance. Gochar 14%, dasha 14%, navtara 16%. Birth chart leads.",
+  );
   // 3 comparison points: time structure, score difference, effect difference
   const halfLabel = p.uphora.half === 1 ? "mukhya (first 30 min, stronger)" : "uphora (second 30 min, weaker)";
   reasons.push(
@@ -197,8 +255,8 @@ export function scoreMuhurat(
   );
   reasons.push(
     tara.isShubh
-      ? `Navtara is ${tara.name} (favourable)`
-      : `Navtara is ${tara.name} (unfavourable)`,
+      ? `Navtara is ${tara.name}, avritti ${tara.avritti} (favourable)`
+      : `Navtara is ${tara.name}, avritti ${tara.avritti} (unfavourable)`,
   );
   reasons.push(
     chandra.isShubh
@@ -206,6 +264,8 @@ export function scoreMuhurat(
       : `Moon is ${chandra.distance} from natal Moon (dusthana)`,
   );
   reasons.push(`Vimshottari ${dasha.maha}–${dasha.antar}`);
+  reasons.push(extra.notes[0] ?? "Suryabala");
+  if (extra.supports.some((x) => x.startsWith("Abhujh"))) reasons.push(extra.supports.find((x) => x.startsWith("Abhujh"))!);
   const kp = kpNadiHouses(act);
   const mahaG = chart.grahas.find((g) => g.name === dasha.maha);
   if (mahaG) {
@@ -296,6 +356,20 @@ export function scoreMuhurat(
               ? "Usable if needed"
               : "Prefer another window",
     navtaraFlag,
+    muhurta,
+    birth: {
+      lagna: chart.lagna,
+      nakshatra: chart.janmaNakshatra.name,
+      rashi: chart.janmaRashi.name,
+      grahas: chart.grahas.map((g) => ({
+        name: g.name,
+        rashi: g.rashi,
+        house: g.houseFromLagna,
+        d9: RASHIS[navamsaSign(g.lon)],
+        digbal: g.digbal,
+      })),
+    },
+    weights: w,
   };
 }
 

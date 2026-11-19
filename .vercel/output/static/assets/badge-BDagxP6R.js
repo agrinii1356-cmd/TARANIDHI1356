@@ -1,0 +1,1 @@
+import{N as e,j as t}from"./store-CCtSDYvV.js";var n=e();function r({className:e,tone:r=`neutral`,...i}){return(0,n.jsx)(`span`,{className:t(`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium`,{neutral:`bg-surface-2 text-muted`,good:`bg-good-soft text-good`,warn:`bg-warn-soft text-warn`,bad:`bg-bad-soft text-bad`}[r],e),...i})}export{r as t};

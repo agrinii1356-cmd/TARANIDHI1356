@@ -1,0 +1,1 @@
+import{N as e,j as t}from"./store-CCtSDYvV.js";var n=e();function r({className:e,...r}){return(0,n.jsx)(`div`,{className:t(`min-w-0 rounded-[28px] border border-line bg-surface p-4 sm:p-5`,e),...r})}export{r as t};

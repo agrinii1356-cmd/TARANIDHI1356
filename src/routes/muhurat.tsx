@@ -5,8 +5,10 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Label } from "@/components/ui/input";
 import { addDaysISO, formatTime, formatWhen, qualityTone, todayISODate } from "@/lib/format";
-import { ACTIVITIES, CATEGORIES, getActivity, type Tier } from "@/lib/panchang/activities";
+import { ACTIVITIES, CATEGORIES, getActivity, type Paddhati, type Tier } from "@/lib/panchang/activities";
+import { PARASHAR_CATEGORIES } from "@/lib/panchang/parashar";
 import { chartFromProfile, useProfile } from "@/lib/panchang/store";
+import { CITIES } from "@/lib/panchang/cities";
 import { searchMuhurats, type ScoreResult } from "@/lib/panchang/scoring";
 import { planAccess, useBilling } from "@/lib/billing";
 import { useT } from "@/lib/prefs";
@@ -34,6 +36,23 @@ const CAT_HI: Record<string, string> = {
   Technology: "तकनीक",
   Daily: "रोज़",
   Spiritual: "साधना",
+  Baby: "शिशु",
+  Construction: "निर्माण",
+  Dealing: "लेन-देन",
+  Farming: "कृषि",
+  "Grih Pravesh": "गृह प्रवेश",
+  Manufacturing: "निर्माण कार्य",
+  Marriage: "विवाह",
+  Medical: "औषधि",
+  Misc: "विविध",
+  Official: "अधिकार",
+  Pregnancy: "गर्भ",
+  Purchasing: "खरीद",
+  Selling: "बेचना",
+  Starting: "आरंभ",
+  Using: "उपयोग",
+  Wearing: "पहनना",
+  Journeys: "यात्रा",
 };
 
 export const Route = createFileRoute("/muhurat")({
@@ -48,11 +67,14 @@ function MuhuratPage() {
   const profile = useProfile((s) => s.profile);
   const access = planAccess(useBilling());
   const { lang, t } = useT();
+  const [paddhati, setPaddhati] = useState<Paddhati>("advance");
   const [tier, setTier] = useState<Tier | "all">("all");
   const [activity, setActivity] = useState(qActivity ?? "job_interview");
   const [start, setStart] = useState(todayISODate());
   const [end, setEnd] = useState(addDaysISO(todayISODate(), 14));
+  const [eventCity, setEventCity] = useState("");
   const [filter, setFilter] = useState("All");
+  const [sub, setSub] = useState("All");
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<{ priority: ScoreResult[]; alerts: ScoreResult[] } | null>(null);
   const [blocked, setBlocked] = useState(false);
@@ -69,28 +91,45 @@ function MuhuratPage() {
     setResults(null);
   }, [qActivity]);
 
+  const cats = paddhati === "traditional" ? PARASHAR_CATEGORIES : [...CATEGORIES];
+  const subOf = (a: { name: string; nameHi: string; paddhati: string }) =>
+    a.paddhati === "advance" && a.name.includes(": ") ? a.name.split(": ")[0] : a.name;
+  const subs = useMemo(() => {
+    if (filter === "All") return [] as string[];
+    const seen = new Set<string>();
+    for (const a of ACTIVITIES) {
+      if (a.paddhati !== paddhati) continue;
+      if (a.category !== filter) continue;
+      if (tier !== "all" && a.tier !== tier) continue;
+      seen.add(subOf(a));
+    }
+    return [...seen];
+  }, [filter, paddhati, tier]);
   const list = useMemo(() => {
     return ACTIVITIES.filter((a) => {
+      const padOk = a.paddhati === paddhati;
       const tierOk = tier === "all" || a.tier === tier;
       const catOk = filter === "All" || a.category === filter;
+      const subOk = sub === "All" || subOf(a) === sub;
       const q = query.trim().toLowerCase();
       const textOk =
         !q ||
         a.name.toLowerCase().includes(q) ||
         a.nameHi.includes(q) ||
-        a.category.toLowerCase().includes(q);
-      return tierOk && catOk && textOk;
+        a.category.toLowerCase().includes(q) ||
+        (a.western ?? "").toLowerCase().includes(q);
+      return padOk && tierOk && catOk && subOk && textOk;
     });
-  }, [filter, query, tier]);
+  }, [filter, query, tier, paddhati, sub]);
 
   const current = ACTIVITIES.find((a) => a.key === activity) ?? list[0];
   const counts = useMemo(() => {
     const out: Record<string, number> = {};
-    for (const c of CATEGORIES) {
-      out[c] = ACTIVITIES.filter((a) => a.category === c && (tier === "all" || a.tier === tier)).length;
+    for (const c of cats) {
+      out[c] = ACTIVITIES.filter((a) => a.paddhati === paddhati && a.category === c && (tier === "all" || a.tier === tier)).length;
     }
     return out;
-  }, [tier]);
+  }, [tier, paddhati, cats]);
 
   function ask() {
     if (!profile || !current) return;
@@ -101,14 +140,18 @@ function MuhuratPage() {
     setBlocked(false);
     setBusy(true);
     const chart = chartFromProfile(profile);
+    const city = CITIES.find((c) => c.name === eventCity);
+    const lat = city?.lat ?? profile.lat;
+    const lon = city?.lon ?? profile.lon;
+    const tz = city?.tz ?? profile.tz;
     const found = searchMuhurats({
       activityKey: current.key,
       start: new Date(start + "T00:00:00"),
       end: new Date(end + "T23:59:00"),
       chart,
-      lat: profile.lat,
-      lon: profile.lon,
-      tz: profile.tz,
+      lat,
+      lon,
+      tz,
       maxResults: 1,
       minScore: current.tier === "major" ? 58 : 50,
     });
@@ -131,6 +174,42 @@ function MuhuratPage() {
             {access.kind === "expired" ? (lang === "hi" ? " · डेमो खत्म" : " · demo ended") : ""}
           </p>
         </div>
+
+        <div className="grid grid-cols-2 gap-2">
+          {(
+            [
+              ["advance", lang === "hi" ? "एडवांस" : "Advance"],
+              ["traditional", lang === "hi" ? "पारंपरिक" : "Traditional"],
+            ] as const
+          ).map(([id, label]) => (
+            <button
+              key={id}
+              type="button"
+              onClick={() => {
+                setPaddhati(id);
+                setFilter("All");
+                setSub("All");
+                setResults(null);
+              }}
+              className={
+                paddhati === id
+                  ? "min-h-11 rounded-full bg-ink px-2 text-sm text-bg"
+                  : "min-h-11 rounded-full border border-line bg-surface px-2 text-sm text-muted"
+              }
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+        <p className="text-sm leading-relaxed text-muted">
+          {paddhati === "traditional"
+            ? lang === "hi"
+              ? "पारंपरिक पद्धति। 229 शास्त्रीय मुहूर्त। पंचांग के नियम। जन्म कुंडली द्वितीय।"
+              : "Traditional paddhati. 229 classical muhurtas. Panchang rules first. Birth chart second."
+            : lang === "hi"
+              ? "एडवांस पद्धति। जन्म कुंडली आधार। ताराबल, चंद्रबल, दशा, गोचर, पक्षी।"
+              : "Advance paddhati. Birth chart is the base. Tarabal, Chandrabala, dasha, gochar, pakshi."}
+        </p>
 
         <div className="grid grid-cols-3 gap-2">
           {(
@@ -210,7 +289,7 @@ function MuhuratPage() {
           <div className={menuOpen ? "grid min-w-0 gap-3 sm:grid-cols-[11rem_minmax(0,1fr)]" : "min-w-0"}>
             {menuOpen ? (
               <nav className="max-h-72 space-y-0.5 overflow-y-auto rounded-lg border border-line p-1">
-                {["All", ...CATEGORIES].filter((c) => c === "All" || (counts[c] ?? 0) > 0).map((c) => (
+                {["All", ...cats].filter((c) => c === "All" || (counts[c] ?? 0) > 0).map((c) => (
                   <button
                     key={c}
                     type="button"
@@ -231,8 +310,33 @@ function MuhuratPage() {
               </nav>
             ) : null}
             <div className="min-w-0">
+            {filter !== "All" && subs.length > 0 ? (
+              <div className="mb-3">
+                <Label>{lang === "hi" ? "उपश्रेणी" : "Subcategory"}</Label>
+                <div className="mt-2 flex flex-wrap gap-1">
+                  {["All", ...subs].map((s) => (
+                    <button
+                      key={s}
+                      type="button"
+                      onClick={() => {
+                        setSub(s);
+                        setResults(null);
+                      }}
+                      className={
+                        sub === s
+                          ? "rounded-full bg-ink px-3 py-1 text-xs text-bg"
+                          : "rounded-full border border-line bg-surface px-3 py-1 text-xs text-muted"
+                      }
+                    >
+                      {s}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ) : null}
             <Label>
               {lang === "hi" ? "इस श्रेणी के काम" : "Activities"} · {catLabel(filter)}
+              {sub !== "All" ? ` · ${sub}` : ""}
             </Label>
             {list.length === 0 ? (
               <p className="mt-2 text-sm text-muted">
@@ -274,6 +378,24 @@ function MuhuratPage() {
               </p>
             ) : null}
             </div>
+          </div>
+          <div>
+            <Label htmlFor="place">{lang === "hi" ? "मुहूर्त का स्थान" : "Muhurta place"}</Label>
+            <select
+              id="place"
+              value={eventCity}
+              onChange={(e) => setEventCity(e.target.value)}
+              className="h-11 w-full rounded-md border border-line bg-surface px-3 text-sm"
+            >
+              <option value="">
+                {lang === "hi" ? "प्रोफाइल का स्थान" : "Profile place"} ({profile.city})
+              </option>
+              {CITIES.slice(0, 80).map((c) => (
+                <option key={c.name} value={c.name}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
@@ -365,15 +487,17 @@ function ScoreCard({ title, result, alert }: { title: string; result: ScoreResul
   const act = getActivity(result.activityKey);
   const p = result.panchang;
   const prabhav = act ? eventPrabhav(act, p, lang) : null;
+  const w = result.weights;
+  const pct = (n: number) => `${Math.round(n * 100)}%`;
   const parts = [
-    [lang === "hi" ? "पंचांग" : "Panchang", result.breakdown.panchanga, "26%"],
-    [lang === "hi" ? "नवतारा" : "Navtara", result.breakdown.navtara, "14%"],
-    [lang === "hi" ? "चंद्र" : "Moon", result.breakdown.chandra, "8%"],
-    [lang === "hi" ? "होरा" : "Hora", result.breakdown.hora, "12%"],
-    [lang === "hi" ? "पक्षी" : "Pakshi", result.breakdown.pakshi, "12%"],
-    [lang === "hi" ? "गोचर" : "Gochar", result.breakdown.gochar, "12%"],
-    [lang === "hi" ? "दशा" : "Dasha", result.breakdown.dasha, "10%"],
-    [lang === "hi" ? "योग" : "Yoga", result.breakdown.golden, "6%"],
+    [lang === "hi" ? "पंचांग" : "Panchang", result.breakdown.panchanga, pct(w.panch)],
+    [lang === "hi" ? "ताराबल" : "Tarabal", result.breakdown.navtara, pct(w.navtara)],
+    [lang === "hi" ? "चंद्र" : "Moon", result.breakdown.chandra, pct(w.chandra)],
+    [lang === "hi" ? "होरा" : "Hora", result.breakdown.hora, pct(w.hora)],
+    [lang === "hi" ? "पक्षी" : "Pakshi", result.breakdown.pakshi, pct(w.pakshi)],
+    [lang === "hi" ? "गोचर" : "Gochar", result.breakdown.gochar, pct(w.gochar)],
+    [lang === "hi" ? "दशा" : "Dasha", result.breakdown.dasha, pct(w.dasha)],
+    [lang === "hi" ? "योग" : "Yoga", result.breakdown.golden, pct(w.golden)],
   ] as const;
   return (
     <Card className={alert ? "rounded-xl border-bad p-4" : "rounded-xl p-4"}>
@@ -443,9 +567,54 @@ function ScoreCard({ title, result, alert }: { title: string; result: ScoreResul
       </p>
       <p className="mt-2 text-xs text-muted">
         {lang === "hi"
-          ? "आधार: पंचांग, नवतारा, चंद्र, होरा, पक्षी, गोचर, दशा में KP/नाड़ी भाव, नन्दादि, मृत्यु/दग्ध, शून्य, भद्रा मुख-पुच्छ।"
-          : "Basis: panchang, navtara, moon, hora, pakshi, gochar, dasha with KP/Nadi houses, nandaadi, mrityu/dagdha, shunya, bhadra mukha-puccha."}
+          ? "आधार: जन्म कुंडली + मुहूर्त लग्न कुंडली + मुहूर्त नवमांश। स्थान अनिवार्य।"
+          : "Basis: birth chart + muhurta lagna chart + muhurta navamsa. Place is required."}
       </p>
+      <div className="mt-3 grid gap-2 sm:grid-cols-2">
+        {result.birth ? (
+          <div className="rounded-lg border border-line p-2 text-xs">
+            <p className="font-medium">{lang === "hi" ? "जन्म कुंडली" : "Birth chart"}</p>
+            <p className="mt-1 text-muted">
+              {lang === "hi" ? "लग्न" : "Lagna"} {nm(result.birth.lagna)} · {nm(result.birth.nakshatra)} · {nm(result.birth.rashi)}
+            </p>
+            <ul className="mt-1 space-y-0.5">
+              {result.birth.grahas.map((g) => (
+                <li key={"b-" + g.name}>
+                  {nm(g.name)} · {nm(g.rashi)} · {lang === "hi" ? "भाव" : "house"} {g.house}
+                  {g.digbal ? " · digbal" : ""} · D9 {nm(g.d9)}
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
+        {result.muhurta ? (
+          <>
+          <div className="rounded-lg border border-line p-2 text-xs">
+            <p className="font-medium">{lang === "hi" ? "मुहूर्त लग्न कुंडली" : "Muhurta lagna chart"}</p>
+            <p className="mt-1 text-muted">{lang === "hi" ? "लग्न" : "Lagna"} {nm(result.muhurta.lagna)} · {result.muhurta.place}</p>
+            <ul className="mt-1 space-y-0.5">
+              {result.muhurta.grahas.map((g) => (
+                <li key={g.name}>
+                  {nm(g.name)} · {nm(g.rashi)} · {lang === "hi" ? "भाव" : "house"} {g.house}
+                  {g.digbal ? " · digbal" : ""}
+                </li>
+              ))}
+            </ul>
+          </div>
+          <div className="rounded-lg border border-line p-2 text-xs">
+            <p className="font-medium">{lang === "hi" ? "मुहूर्त नवमांश" : "Muhurta navamsa"}</p>
+            <p className="mt-1 text-muted">{lang === "hi" ? "D9 लग्न" : "D9 lagna"} {nm(result.muhurta.lagnaD9)}</p>
+            <ul className="mt-1 space-y-0.5">
+              {result.muhurta.grahas.map((g) => (
+                <li key={g.name + "-d9"}>
+                  {nm(g.name)} · D9 {nm(g.d9)}
+                </li>
+              ))}
+            </ul>
+          </div>
+          </>
+        ) : null}
+      </div>
       {result.sutra.blocks.length ? (
         <p className="mt-2 text-sm text-bad">
           {lang === "hi" ? "बंद" : "Closed"}: {result.sutra.blocks.join(" · ")}

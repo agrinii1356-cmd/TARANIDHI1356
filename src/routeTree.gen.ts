@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as CalendarRouteImport } from './routes/calendar'
 import { Route as MuhuratRouteImport } from './routes/muhurat'
+import { Route as PakshiRouteImport } from './routes/pakshi'
 import { Route as PanchangRouteImport } from './routes/panchang'
 import { Route as ProfileRouteImport } from './routes/profile'
 
@@ -30,6 +31,11 @@ const MuhuratRoute = MuhuratRouteImport.update({
   path: '/muhurat',
   getParentRoute: () => rootRouteImport,
 } as any)
+const PakshiRoute = PakshiRouteImport.update({
+  id: '/pakshi',
+  path: '/pakshi',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const PanchangRoute = PanchangRouteImport.update({
   id: '/panchang',
   path: '/panchang',
@@ -45,6 +51,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/calendar': typeof CalendarRoute
   '/muhurat': typeof MuhuratRoute
+  '/pakshi': typeof PakshiRoute
   '/panchang': typeof PanchangRoute
   '/profile': typeof ProfileRoute
 }
@@ -52,6 +59,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/calendar': typeof CalendarRoute
   '/muhurat': typeof MuhuratRoute
+  '/pakshi': typeof PakshiRoute
   '/panchang': typeof PanchangRoute
   '/profile': typeof ProfileRoute
 }
@@ -60,21 +68,31 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/calendar': typeof CalendarRoute
   '/muhurat': typeof MuhuratRoute
+  '/pakshi': typeof PakshiRoute
   '/panchang': typeof PanchangRoute
   '/profile': typeof ProfileRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/calendar' | '/muhurat' | '/panchang' | '/profile'
+  fullPaths:
+    '/' | '/calendar' | '/muhurat' | '/pakshi' | '/panchang' | '/profile'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/calendar' | '/muhurat' | '/panchang' | '/profile'
-  id: '__root__' | '/' | '/calendar' | '/muhurat' | '/panchang' | '/profile'
+  to: '/' | '/calendar' | '/muhurat' | '/pakshi' | '/panchang' | '/profile'
+  id:
+    | '__root__'
+    | '/'
+    | '/calendar'
+    | '/muhurat'
+    | '/pakshi'
+    | '/panchang'
+    | '/profile'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   CalendarRoute: typeof CalendarRoute
   MuhuratRoute: typeof MuhuratRoute
+  PakshiRoute: typeof PakshiRoute
   PanchangRoute: typeof PanchangRoute
   ProfileRoute: typeof ProfileRoute
 }
@@ -102,6 +120,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof MuhuratRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/pakshi': {
+      id: '/pakshi'
+      path: '/pakshi'
+      fullPath: '/pakshi'
+      preLoaderRoute: typeof PakshiRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/panchang': {
       id: '/panchang'
       path: '/panchang'
@@ -123,6 +148,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   CalendarRoute: CalendarRoute,
   MuhuratRoute: MuhuratRoute,
+  PakshiRoute: PakshiRoute,
   PanchangRoute: PanchangRoute,
   ProfileRoute: ProfileRoute,
 }

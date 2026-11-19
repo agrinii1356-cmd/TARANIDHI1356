@@ -41,6 +41,7 @@ export type TaraResult = {
   isShubh: boolean;
   score: number;
   count: number;
+  avritti: 1 | 2 | 3;
 };
 
 export type ChandraResult = {
@@ -132,12 +133,17 @@ export function calculateTaraBala(janmaIndex: number, currentIndex: number): Tar
   if (remainder === 2 || remainder === 9) score = 25;
   else if (remainder === 4 || remainder === 6 || remainder === 8) score = 18;
   else if (remainder === 1) score = 5;
+  const avritti = (count <= 9 ? 1 : count <= 18 ? 2 : 3) as 1 | 2 | 3;
+  // First cycle of Vipat/Pratyari/Vadha is heavier. Third is lighter.
+  if ((remainder === 3 || remainder === 5 || remainder === 7) && avritti === 1) score -= 8;
+  if ((remainder === 3 || remainder === 5 || remainder === 7) && avritti === 3) score += 6;
   return {
     number: remainder,
     name: TARA_NAMES[remainder],
     isShubh,
     score,
     count,
+    avritti,
   };
 }
 

@@ -1,13 +1,19 @@
+import { CATALOG } from "./catalog";
+import { PARASHAR } from "./parashar";
 export type Tier = "daily" | "major";
 export type Purushartha = "dharma" | "artha" | "kama" | "moksha";
 export type Tatva = "agni" | "prithvi" | "vayu" | "jala";
 export type Guna = "sattva" | "rajas" | "tamas";
+
+export type Paddhati = "traditional" | "advance";
 
 export type Activity = {
   key: string;
   name: string;
   nameHi: string;
   category: string;
+  paddhati: Paddhati;
+  western?: string;
   preferredVara: string[];
   preferredNakshatra: string[];
   avoidTithi: number[];
@@ -21,7 +27,7 @@ export type Activity = {
   creditCost: number;
 };
 
-type Seed = Omit<Activity, "tier" | "purushartha" | "tatva" | "guna" | "creditCost">;
+type Seed = Omit<Activity, "tier" | "purushartha" | "tatva" | "guna" | "creditCost" | "paddhati" | "western">;
 
 const careerVara = ["Wednesday", "Thursday", "Friday"];
 const financeVara = ["Thursday", "Friday", "Wednesday"];
@@ -289,6 +295,7 @@ function finalize(seed: Seed): Activity {
   const major = MAJOR_KEYS.has(seed.key) || seed.minTara >= 6;
   return {
     ...seed,
+    paddhati: "advance",
     tier: major ? "major" : "daily",
     purushartha: CAT_PURUSHARTHA[seed.category] ?? "artha",
     tatva: CAT_TATVA[seed.category] ?? "vayu",
@@ -297,7 +304,56 @@ function finalize(seed: Seed): Activity {
   };
 }
 
-export const ACTIVITIES: Activity[] = SEED.map(finalize);
+const TRAD_RULE: Record<string, { vara: string[]; stars: string[]; karaka: string[]; avoid: number[]; minTara: number; major: boolean }> = {
+  Baby: { vara: ["Thursday", "Monday", "Wednesday"], stars: ["Rohini", "Pushya", "Hasta"], karaka: ["Moon", "Jupiter"], avoid: [4, 9, 14], minTara: 4, major: true },
+  Business: { vara: ["Wednesday", "Thursday", "Friday"], stars: ["Pushya", "Hasta", "Anuradha"], karaka: ["Mercury", "Jupiter"], avoid: [4, 9, 14], minTara: 4, major: true },
+  Construction: { vara: ["Thursday", "Friday"], stars: ["Rohini", "Uttara Phalguni", "Uttara Ashadha"], karaka: ["Jupiter", "Venus"], avoid: [4, 9, 14, 30], minTara: 6, major: true },
+  Dealing: { vara: ["Thursday", "Friday", "Wednesday"], stars: ["Pushya", "Rohini", "Hasta"], karaka: ["Jupiter", "Mercury"], avoid: [4, 9, 14], minTara: 4, major: false },
+  Education: { vara: ["Wednesday", "Thursday"], stars: ["Hasta", "Pushya", "Punarvasu"], karaka: ["Mercury", "Jupiter"], avoid: [4, 9], minTara: 2, major: false },
+  Farming: { vara: ["Thursday", "Monday"], stars: ["Rohini", "Pushya", "Uttara Phalguni"], karaka: ["Moon", "Jupiter"], avoid: [4, 9], minTara: 2, major: false },
+  "Grih Pravesh": { vara: ["Thursday", "Friday", "Monday"], stars: ["Rohini", "Uttara Phalguni", "Uttara Bhadrapada"], karaka: ["Venus", "Jupiter"], avoid: [4, 9, 14, 30], minTara: 6, major: true },
+  Manufacturing: { vara: ["Wednesday", "Friday"], stars: ["Hasta", "Pushya"], karaka: ["Mercury", "Venus"], avoid: [4, 9], minTara: 2, major: false },
+  Marriage: { vara: ["Monday", "Wednesday", "Thursday", "Friday"], stars: ["Rohini", "Revati", "Anuradha", "Uttara Phalguni"], karaka: ["Venus", "Jupiter"], avoid: [4, 8, 9, 14, 30], minTara: 6, major: true },
+  Medical: { vara: ["Monday", "Wednesday", "Thursday"], stars: ["Ashwini", "Hasta", "Pushya"], karaka: ["Moon", "Mercury"], avoid: [4, 9, 14, 30], minTara: 4, major: true },
+  Misc: { vara: ["Wednesday", "Thursday", "Friday"], stars: ["Hasta", "Pushya"], karaka: ["Mercury"], avoid: [4, 9], minTara: 0, major: false },
+  Official: { vara: ["Thursday", "Sunday", "Wednesday"], stars: ["Pushya", "Hasta", "Uttara Phalguni"], karaka: ["Sun", "Jupiter"], avoid: [4, 9, 14], minTara: 4, major: true },
+  Pregnancy: { vara: ["Monday", "Thursday", "Friday"], stars: ["Rohini", "Pushya", "Revati"], karaka: ["Moon", "Venus"], avoid: [4, 9, 14, 30], minTara: 6, major: true },
+  Purchasing: { vara: ["Thursday", "Friday", "Wednesday"], stars: ["Pushya", "Rohini", "Hasta"], karaka: ["Venus", "Mercury"], avoid: [4, 9], minTara: 2, major: false },
+  Selling: { vara: ["Wednesday", "Friday"], stars: ["Hasta", "Swati"], karaka: ["Mercury"], avoid: [4, 9], minTara: 2, major: false },
+  Starting: { vara: ["Thursday", "Wednesday", "Friday"], stars: ["Pushya", "Hasta", "Rohini"], karaka: ["Jupiter", "Mercury"], avoid: [4, 9, 14], minTara: 4, major: true },
+  Using: { vara: ["Wednesday", "Friday"], stars: ["Hasta", "Pushya"], karaka: ["Mercury"], avoid: [4, 9], minTara: 0, major: false },
+  Wearing: { vara: ["Thursday", "Friday", "Monday"], stars: ["Rohini", "Pushya", "Hasta"], karaka: ["Venus", "Moon"], avoid: [4, 9], minTara: 2, major: false },
+  Journeys: { vara: ["Wednesday", "Thursday", "Friday"], stars: ["Ashwini", "Mrigashira", "Hasta"], karaka: ["Mercury", "Moon"], avoid: [4, 9, 14], minTara: 2, major: false },
+};
+
+const TRADITIONAL: Activity[] = PARASHAR.map((p) => {
+  const r = TRAD_RULE[p.category] ?? TRAD_RULE.Misc;
+  return {
+    key: p.key,
+    name: p.name,
+    nameHi: p.nameHi,
+    category: p.category,
+    paddhati: "traditional",
+    western: p.western,
+    preferredVara: r.vara,
+    preferredNakshatra: r.stars,
+    avoidTithi: r.avoid,
+    minTara: r.minTara,
+    karaka: r.karaka,
+    blurb: `${p.western}. Traditional panchang election.`,
+    tier: r.major ? "major" : "daily",
+    purushartha: p.category === "Marriage" || p.category === "Baby" ? "kama" : "artha",
+    tatva: "prithvi",
+    guna: "sattva",
+    creditCost: r.major ? 5 : 1,
+  };
+});
+
+export const ACTIVITIES: Activity[] = [
+  ...SEED.map(finalize),
+  ...(CATALOG as Activity[]).map((a) => ({ ...a, paddhati: "advance" as const })),
+  ...TRADITIONAL,
+];
 
 export function getActivity(key: string): Activity | undefined {
   return ACTIVITIES.find((a) => a.key === key);

@@ -1,5 +1,5 @@
 import { Link, useRouterState } from "@tanstack/react-router";
-import { CalendarDays, Compass, Home, Search, UserRound } from "lucide-react";
+import { Bird, CalendarDays, Compass, Home, Search, UserRound } from "lucide-react";
 import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
 import { planAccess, useBilling } from "@/lib/billing";
@@ -9,6 +9,7 @@ const NAV = [
   { to: "/", key: "today", icon: Home },
   { to: "/muhurat", key: "muhurat", icon: Search },
   { to: "/panchang", key: "panchang", icon: Compass },
+  { to: "/pakshi", key: "pakshi", icon: Bird },
   { to: "/calendar", key: "calendar", icon: CalendarDays },
   { to: "/profile", key: "nidhi", icon: UserRound },
 ] as const;
@@ -79,7 +80,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       </div>
 
       <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-line bg-surface/95 pb-[env(safe-area-inset-bottom)] backdrop-blur lg:hidden">
-        <div className="mx-auto grid w-full max-w-lg grid-cols-5">{links("bottom")}</div>
+        <div className="mx-auto grid w-full max-w-lg grid-cols-6">{links("bottom")}</div>
       </nav>
     </div>
   );

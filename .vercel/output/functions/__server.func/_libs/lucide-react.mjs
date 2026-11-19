@@ -82,6 +82,38 @@ var createLucideIcon = (iconName, iconNode) => {
 * This source code is licensed under the ISC license.
 * See the LICENSE file in the root directory of this source tree.
 */
+var Bird = createLucideIcon("bird", [
+	["path", {
+		d: "M16 7h.01",
+		key: "1kdx03"
+	}],
+	["path", {
+		d: "M3.4 18H12a8 8 0 0 0 8-8V7a4 4 0 0 0-7.28-2.3L2 20",
+		key: "oj1oa8"
+	}],
+	["path", {
+		d: "m20 7 2 .5-2 .5",
+		key: "12nv4d"
+	}],
+	["path", {
+		d: "M10 18v3",
+		key: "1yea0a"
+	}],
+	["path", {
+		d: "M14 17.75V21",
+		key: "1pymcb"
+	}],
+	["path", {
+		d: "M7 18a6 6 0 0 0 3.84-10.61",
+		key: "1npnn0"
+	}]
+]);
+/**
+* @license lucide-react v0.510.0 - ISC
+*
+* This source code is licensed under the ISC license.
+* See the LICENSE file in the root directory of this source tree.
+*/
 var Briefcase = createLucideIcon("briefcase", [["path", {
 	d: "M16 20V4a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16",
 	key: "jecpp"
@@ -402,4 +434,4 @@ var Wallet = createLucideIcon("wallet", [["path", {
 	key: "xoc0q4"
 }]]);
 //#endregion
-export { Sparkles as a, Plane as c, House as d, Compass as f, Briefcase as g, CalendarDays as h, TriangleAlert as i, MapPin as l, ChevronLeft as m, Video as n, Search as o, ChevronRight as p, UserRound as r, Scale as s, Wallet as t, Landmark as u };
+export { Bird as _, Sparkles as a, Plane as c, House as d, Compass as f, Briefcase as g, CalendarDays as h, TriangleAlert as i, MapPin as l, ChevronLeft as m, Video as n, Search as o, ChevronRight as p, UserRound as r, Scale as s, Wallet as t, Landmark as u };
