@@ -560,8 +560,12 @@ function ScoreCard({ title, result, alert }: { title: string; result: ScoreResul
 
   return (
     <article className="overflow-hidden rounded-2xl border border-[#d4b15a]/50 bg-[#070b18] text-[#f6e7c1] shadow-[0_0_40px_rgba(212,177,90,0.12)]">
-      <img src="/logo.png" alt="TaraNidhi" className="mx-auto h-36 w-full max-w-md object-cover object-[center_42%]" />
-      <div className="space-y-4 px-4 pb-5 sm:px-6">
+      <div className="space-y-4 px-4 py-5 sm:px-6">
+        <img
+          src="/logo.png"
+          alt="TaraNidhi"
+          className="mx-auto h-16 w-16 rounded-full border border-[#d4b15a] object-cover object-[center_22%]"
+        />
         <div className="text-center">
           <p className="text-[11px] uppercase tracking-[0.22em] text-[#d4b15a]">{name}</p>
           <p className="mt-1 font-display text-2xl text-[#fff6dc]">{title}</p>
