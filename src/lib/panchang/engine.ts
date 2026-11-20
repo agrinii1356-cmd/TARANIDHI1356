@@ -153,8 +153,10 @@ export function calculateChandraBala(
   currentRashi: number,
 ): ChandraResult {
   const distance = ((currentRashi - janmaRashi + 12) % 12) + 1;
-  const isShubh = ![4, 8, 12].includes(distance);
-  return { distance, isShubh, score: isShubh ? 15 : -15 };
+  // Chandra Bala is present in 1, 3, 6, 7, 10, 11 from the birth rashi.
+  // The 6th is bala. It is not avoided. 2, 4, 5, 8, 9, 12 have no bala.
+  const isShubh = [1, 3, 6, 7, 10, 11].includes(distance);
+  return { distance, isShubh, score: isShubh ? 22 : -22 };
 }
 
 function rahuKaal(dt: Date, sunrise: Date, sunset: Date) {
@@ -408,6 +410,11 @@ const MONTH_BY_NAKSHATRA = [
   "Ashwina",
   "Ashwina",
 ];
+
+export function amantaMonth(nakIndex: number) {
+  const i = ((nakIndex % 27) + 27) % 27;
+  return MONTH_BY_NAKSHATRA[i] ?? "Ashwina";
+}
 
 export type PlaceDay = {
   tithiDay: number;

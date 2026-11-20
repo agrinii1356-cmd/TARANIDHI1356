@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import { MAX_PROFILES, useBilling } from "@/lib/billing";
+import { chartAllowance, useBilling } from "@/lib/billing";
 import { CITIES } from "./cities";
 import { getBirthChart, type BirthChart } from "./engine";
 
@@ -78,7 +78,7 @@ export const useProfile = create<State>()(
         const next = { ...p, id };
         const profiles = get().profiles;
         const exists = profiles.some((x) => x.id === id);
-        if (!exists && profiles.length >= MAX_PROFILES) return false;
+        if (!exists && profiles.length >= chartAllowance(useBilling.getState())) return false;
         const list = exists ? profiles.map((x) => (x.id === id ? next : x)) : [...profiles, next];
         writeStored({ profile: next, profiles: list });
         set({ profile: next, profiles: list });
@@ -112,7 +112,7 @@ export const useProfile = create<State>()(
         if (!profiles.length && legacy) profiles = [withId(legacy)];
         if (current.profile) {
           const live = withId(current.profile);
-          if (!profiles.some((x) => x.id === live.id) && profiles.length < MAX_PROFILES) {
+          if (!profiles.some((x) => x.id === live.id) && profiles.length < chartAllowance(useBilling.getState())) {
             profiles = [...profiles, live];
           }
         }

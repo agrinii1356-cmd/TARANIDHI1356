@@ -10,6 +10,9 @@ import { chartFromProfile, useProfile } from "@/lib/panchang/store";
 import { refreshGps, useEventPlace, useHere } from "@/lib/panchang/here";
 import { PlacePicker } from "@/components/place-picker";
 import { searchMuhurats, type ScoreResult } from "@/lib/panchang/scoring";
+import { amantaMonth } from "@/lib/panchang/engine";
+import { limbEffect } from "@/lib/panchang/effects";
+import { choghadiyaAt } from "@/lib/panchang/sutra";
 import { planAccess, useBilling } from "@/lib/billing";
 import { useT } from "@/lib/prefs";
 import { localName } from "@/lib/panchang/names";
@@ -71,7 +74,7 @@ function MuhuratPage() {
   const [tier, setTier] = useState<Tier | "all">("all");
   const [activity, setActivity] = useState(qActivity ?? "job_interview");
   const [start, setStart] = useState(qOn ?? todayISODate());
-  const [end, setEnd] = useState(addDaysISO(qOn ?? todayISODate(), 14));
+  const [end, setEnd] = useState(qOn ? addDaysISO(qOn, 14) : "2026-12-04");
   const event = useEventPlace(profile);
   const setHere = useHere((s) => s.setPlace);
   const [filter, setFilter] = useState("All");
@@ -160,7 +163,7 @@ function MuhuratPage() {
       lat,
       lon,
       tz,
-      maxResults: 1,
+      maxResults: 3,
       minScore: current.tier === "major" ? 58 : 50,
     });
     for (const row of [...found.priority, ...found.alerts]) {
@@ -289,29 +292,15 @@ function MuhuratPage() {
             <p className="mt-2 text-xs text-muted">
               {list.length}
               {lang === "hi"
-                ? " काम। लिखने से सूची छँटती है। Enter या Submit मुहूर्त निकालता है।"
-                : " activities. Typing filters. Enter or Submit runs the muhurat."}
+                ? " काम। तारीख और Submit यहीं हैं। सूची नीचे है, स्क्रॉल के बाद नहीं।"
+                : " activities. Dates and Submit sit here. The list is below, not after a scroll."}
             </p>
           </div>
-          <div className="flex items-center justify-between gap-2">
-            <p className="min-w-0 truncate text-sm font-medium">
-              {lang === "hi" ? "श्रेणी" : "Category"} · {catLabel(filter)}
-              {filter !== "All" ? ` · ${counts[filter] ?? 0}` : ""}
+          {current ? (
+            <p className="rounded-lg bg-surface-2 px-3 py-2 text-sm">
+              {lang === "hi" ? "चुना काम" : "Chosen work"} · {lang === "hi" ? current.nameHi : current.name}
             </p>
-            <button
-              type="button"
-              onClick={() => setMenuOpen((v) => !v)}
-              className="min-h-9 shrink-0 rounded-full border border-line px-3 text-xs"
-            >
-              {menuOpen
-                ? lang === "hi"
-                  ? "मेनू बंद"
-                  : "Close menu"
-                : lang === "hi"
-                  ? "श्रेणियाँ"
-                  : "Categories"}
-            </button>
-          </div>
+          ) : null}
           <div>
             <PlacePicker
               id="place"
@@ -329,11 +318,6 @@ function MuhuratPage() {
             >
               {lang === "hi" ? "मेरी जगह (GPS)" : "My location (GPS)"}
             </button>
-            <p className="mt-1 text-sm text-muted">
-              {lang === "hi"
-                ? "डिफ़ॉल्ट वही जगह है जहाँ आप अभी हैं। शहर, देश या GPS बदलने से हर खिड़की उसी जगह की बनेगी। जन्म कुंडली जन्म स्थान पर रहती है। राहु ट्रू नोड है।"
-                : "The default is where you are now. A city, country or GPS change rebuilds every window for that place. The birth chart stays on the birth place. Rahu is the true node."}
-            </p>
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
@@ -372,6 +356,25 @@ function MuhuratPage() {
               </Link>
             </p>
           ) : null}
+          <div className="flex items-center justify-between gap-2">
+            <p className="min-w-0 truncate text-sm font-medium">
+              {lang === "hi" ? "श्रेणी" : "Category"} · {catLabel(filter)}
+              {filter !== "All" ? ` · ${counts[filter] ?? 0}` : ""}
+            </p>
+            <button
+              type="button"
+              onClick={() => setMenuOpen((v) => !v)}
+              className="min-h-9 shrink-0 rounded-full border border-line px-3 text-xs"
+            >
+              {menuOpen
+                ? lang === "hi"
+                  ? "मेनू बंद"
+                  : "Close menu"
+                : lang === "hi"
+                  ? "श्रेणियाँ"
+                  : "Categories"}
+            </button>
+          </div>
           <div className={menuOpen ? "grid min-w-0 gap-3 sm:grid-cols-[11rem_minmax(0,1fr)]" : "min-w-0"}>
             {menuOpen ? (
               <nav className="max-h-72 space-y-0.5 overflow-y-auto rounded-lg border border-line p-1">
@@ -494,9 +497,36 @@ function MuhuratPage() {
           ) : (
             <div className="space-y-3">
               <h2 className="text-sm font-medium">
-                {lang === "hi" ? "आपका समय" : "Your time"}
+                {lang === "hi"
+                  ? `${results.priority.length} शुभ मुहूर्त · ${start} से ${end} तक`
+                  : `${results.priority.length} open muhurats · ${start} to ${end}`}
               </h2>
-              <ScoreCard title={formatWhen(results.priority[0].datetime)} result={results.priority[0]} />
+              <ol className="grid gap-2">
+                {results.priority.map((row, i) => (
+                  <li key={row.datetime} className="flex items-center justify-between gap-3 rounded-xl border border-line bg-surface px-3 py-2">
+                    <span>
+                      <span className="text-xs uppercase tracking-widest text-muted">
+                        {lang === "hi" ? `मुहूर्त ${i + 1}` : `Muhurat ${i + 1}`}
+                      </span>
+                      <span className="mt-0.5 block text-sm">{formatWhen(row.datetime)}</span>
+                    </span>
+                    <span className="font-display text-2xl tabular-nums">{row.finalScore}</span>
+                  </li>
+                ))}
+              </ol>
+              {results.priority.map((row, i) => (
+                <ScoreCard
+                  key={`${row.datetime}-card`}
+                  title={formatWhen(row.datetime)}
+                  result={row}
+                  rank={i + 1}
+                />
+              ))}
+              <p className="text-sm leading-relaxed text-muted">
+                {lang === "hi"
+                  ? "तीन खिड़कियाँ इसलिए कि एक घंटा काफी नहीं। पहला सबसे भारी। दूसरा और तीसरा उसी काम के लिए अगले खुले घंटे हैं। अशुभ नवतार, माण्डी, आठवाँ लग्न और बंद योग काट दिए गए हैं।"
+                  : "Three windows, because one hour is not enough. The first is the heaviest. The next two are the following open hours for the same work. A malefic navtara, Mandi, the 8th lagna and a closed yoga are left out."}
+              </p>
             </div>
           )
         ) : access.ok ? (
@@ -511,9 +541,55 @@ function MuhuratPage() {
   );
 }
 
-function ScoreCard({ title, result, alert }: { title: string; result: ScoreResult; alert?: boolean }) {
+function LimbPress({
+  hi,
+  on,
+  setOn,
+  rows,
+}: {
+  hi: boolean;
+  lang: "hi" | "en";
+  on: string;
+  setOn: (id: string) => void;
+  rows: { id: string; label: string; title: string; body: string }[];
+}) {
+  const picked = rows.find((row) => row.id === on) ?? rows[0];
+  return (
+    <div>
+      <p className="text-xs uppercase tracking-widest text-[#d4b15a]">
+        {hi ? "अंग दबाएँ, प्रभाव खुलेगा" : "Press a limb. Its effect opens."}
+      </p>
+      <div className="mt-2 flex flex-wrap gap-2">
+        {rows.map((row) => (
+          <button
+            key={row.id}
+            type="button"
+            onClick={() => setOn(row.id)}
+            className={
+              picked?.id === row.id
+                ? "min-h-10 rounded-full bg-[#d4b15a] px-3 text-sm text-[#1c1408]"
+                : "min-h-10 rounded-full border border-[#d4b15a]/40 px-3 text-sm text-[#f6e7c1]"
+            }
+          >
+            {row.label}
+          </button>
+        ))}
+      </div>
+      {picked ? (
+        <div className="mt-3 rounded-xl border border-[#d4b15a]/30 bg-[#10182c] px-4 py-3">
+          <p className="text-xs uppercase tracking-widest text-[#d4b15a]">{picked.label}</p>
+          <p className="mt-1 font-display text-2xl text-[#ffe08a]">{picked.title}</p>
+          <p className="mt-2 text-base leading-relaxed text-[#f6e7c1]">{picked.body}</p>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function ScoreCard({ title, result, alert, rank }: { title: string; result: ScoreResult; alert?: boolean; rank?: number }) {
   const { lang } = useT();
   const hi = lang === "hi";
+  const [limbOn, setLimbOn] = useState("Tithi");
   const nm = (name: string) => localName(name, lang);
   const act = getActivity(result.activityKey);
   const p = result.panchang;
@@ -547,6 +623,48 @@ function ScoreCard({ title, result, alert }: { title: string; result: ScoreResul
   ];
   const w = result.weights;
   const pct = (n: number) => `${Math.round(n * 100)}%`;
+  const q15 = formatTime(new Date(new Date(p.horaWindow.start).getTime() + 15 * 60000).toISOString());
+  const bird = result.pakshi;
+  const birdHelps = bird.activity === "Ruling" || bird.activity === "Eating";
+  const dirty = result.sutra.cautions.some((c) => /choghadiya|panchak|rahu|yam|mandi|bhadra/i.test(c));
+  const clean = result.sutra.blocks.length === 0 && !dirty;
+  const golden = clean && result.tara.isShubh && result.chandra.isShubh && firstHalf && birdHelps && result.finalScore >= 78;
+  const birdHi: Record<string, string> = { Vulture: "गिद्ध", Owl: "उल्लू", Crow: "कौआ", Cock: "मुर्गा", Peacock: "मोर" };
+  const actHi: Record<string, string> = {
+    Ruling: "शासन — बात, हस्ताक्षर और शुरुआत के लिए",
+    Eating: "भोजन — पैसे, हाँ और लेने के काम के लिए",
+    Walking: "चलना — छोटा कदम चल सकता है, बड़ा निर्णय नहीं",
+    Sleeping: "नींद — नया काम अभी शुरू न करें",
+    Dying: "मृत — हस्ताक्षर, भुगतान और शुरुआत टालें",
+  };
+  const actEn: Record<string, string> = {
+    Ruling: "Ruling — speak, sign and start",
+    Eating: "Eating — take money, a yes, or an intake",
+    Walking: "Walking — a short step can go, not a big lock",
+    Sleeping: "Sleeping — do not start a new thing",
+    Dying: "Dying — do not sign, pay or begin",
+  };
+  const gandmool = ["Ashwini", "Ashlesha", "Magha", "Jyeshtha", "Mula", "Revati"].includes(p.nakshatra.name);
+  const kharmas = p.sunRashi.name === "Dhanu";
+  const travel = act?.category === "Travel";
+  const when = new Date(result.datetime);
+  const holashtak = when >= new Date("2026-02-24") && when <= new Date("2026-03-03");
+  const chog = choghadiyaAt(p.sunrise, p.sunset, when);
+  const chogHi: Record<string, string> = {
+    Amrit: "अमृत", Kaal: "काल", Shubh: "शुभ", Rog: "रोग", Labh: "लाभ", Udveg: "उद्वेग", Char: "चर",
+  };
+  const bag = [...result.sutra.blocks, ...result.sutra.cautions].join(" | ").toLowerCase();
+  const has = (s: string) => bag.includes(s.toLowerCase());
+  const strong = result.muhurta.grahas.filter((g) => g.digbal).map((g) => nm(g.name));
+  const disha: Record<string, string> = {
+    Sunday: "West",
+    Monday: "East",
+    Tuesday: "North",
+    Wednesday: "North",
+    Thursday: "South",
+    Friday: "West",
+    Saturday: "East",
+  };
   const parts = [
     [hi ? "पंचांग" : "Panchang", result.breakdown.panchanga, pct(w.panch)],
     [hi ? "तारा" : "Star", result.breakdown.navtara, pct(w.navtara)],
@@ -567,12 +685,19 @@ function ScoreCard({ title, result, alert }: { title: string; result: ScoreResul
           className="mx-auto h-16 w-16 rounded-full border border-[#d4b15a] object-cover object-[center_22%]"
         />
         <div className="text-center">
-          <p className="text-[11px] uppercase tracking-[0.22em] text-[#d4b15a]">{name}</p>
+          <p className="text-[11px] uppercase tracking-[0.22em] text-[#d4b15a]">
+            {rank ? (hi ? `मुहूर्त ${rank}` : `Muhurat ${rank}`) + " · " : ""}
+            {name}
+          </p>
           <p className="mt-1 font-display text-2xl text-[#fff6dc]">{title}</p>
           <p className="mt-3 font-display text-4xl tabular-nums text-[#ffe08a]">
             {start}
             <span className="mx-2 text-lg text-[#d4b15a]">–</span>
             {end}
+          </p>
+          <p className="mt-1 text-sm text-[#cbb892]">
+            {hi ? "शुरुआत की 15 मिनट" : "First 15 minutes"} {start}–{q15}
+            {golden ? (hi ? " · गोल्डन विंडो" : " · Golden window") : ""}
           </p>
           <p className="mt-1 text-sm text-[#cbb892]">
             {hi ? "पूरा घंटा। शुरू करें" : "Full hour. Start"} {halfA}–{halfB}
@@ -602,6 +727,148 @@ function ScoreCard({ title, result, alert }: { title: string; result: ScoreResul
             </li>
           ))}
         </ol>
+
+        <div className="space-y-3 rounded-xl border border-[#d4b15a]/25 bg-[#0c1224] px-4 py-3 text-sm leading-relaxed">
+          <div>
+            <p className="text-xs uppercase tracking-widest text-[#d4b15a]">{hi ? "1 · इस घंटे के अंग" : "1 · The limbs of this hour"}</p>
+            <p className="mt-2">
+              {hi
+                ? `लग्न ${nm(result.sutra.lagna)}। होरा ${nm(p.horaLord)}, ${firstHalf ? "मुख्य" : "उपहोरा"} (${halfA}–${halfB})। चौघड़िया ${chog ? `${chogHi[chog.name] ?? chog.name}, ${chog.good ? "साथ देता है" : "सावधानी"}` : "रात है, दिन का चौघड़िया नहीं"}। नक्षत्र ${nm(p.nakshatra.name)}। ताराबल ${nm(result.tara.name)}। ग्रह बल ${strong.length ? strong.join(", ") + " दिग्बल" : "इस लग्न में कोई ग्रह दिग्बल नहीं"}।`
+                : `Lagna ${nm(result.sutra.lagna)}. Hora ${nm(p.horaLord)}, ${firstHalf ? "mukhya" : "uphora"} (${halfA}–${halfB}). Choghadiya ${chog ? `${chog.name}, ${chog.good ? "supports" : "caution"}` : "night, so the day choghadiya is off"}. Star ${nm(p.nakshatra.name)}. Tarabala ${nm(result.tara.name)}. Planetary strength ${strong.length ? strong.join(", ") + " in digbala" : "no planet is in digbala on this lagna"}.`}
+            </p>
+          </div>
+          <div>
+            <p className="text-xs uppercase tracking-widest text-[#d4b15a]">{hi ? "2 · क्या साथ है, क्या टालें" : "2 · What supports, what to hold"}</p>
+            <p className="mt-2">
+              {hi
+                ? `चंद्रबल ${result.chandra.distance}${result.chandra.isShubh ? ", साथ है" : ", साथ नहीं"}। पक्ष ${nm(p.tithi.paksha)}, तिथि ${nm(p.tithi.name)}। जन्म नक्षत्र से यह ${nm(result.tara.name)} है।`
+                : `Chandrabala ${result.chandra.distance}${result.chandra.isShubh ? ", supports" : ", does not support"}. Paksha ${nm(p.tithi.paksha)}, tithi ${nm(p.tithi.name)}. From your birth star this is ${nm(result.tara.name)}.`}
+            </p>
+            <p className="mt-2">
+              {hi
+                ? `राहु काल ${has("rahu") ? "चल रहा है" : "नहीं"}। यमगंड ${has("yamaganda") ? "चल रहा है" : "नहीं"}। गुलिक और माण्डी ${has("mandi") || has("gulika") ? "चल रहे हैं" : "नहीं"}। पंचक ${has("panchak") ? "है" : "नहीं"}। भद्रा ${has("bhadra") ? "है" : "नहीं"}।`
+                : `Rahu Kaal ${has("rahu") ? "is on" : "is off"}. Yamaganda ${has("yamaganda") ? "is on" : "is off"}. Gulika and Mandi ${has("mandi") || has("gulika") ? "are on" : "are off"}. Panchak ${has("panchak") ? "is on" : "is off"}. Bhadra ${has("bhadra") ? "is on" : "is off"}.`}
+            </p>
+            <p className="mt-2">
+              {gandmool
+                ? hi ? "गंडमूल नक्षत्र। जन्म या बड़ी शुरुआत में सावधानी।" : "Gandmool star. Be careful with a birth or a rare start."
+                : hi ? "गंडमूल नहीं।" : "Not a gandmool star."}
+              {" "}
+              {kharmas
+                ? hi ? "खरमास: सूर्य धनु में। विवाह और गृह प्रवेश टालें।" : "Kharmas: the Sun is in Dhanu. Hold a wedding and a house entry."
+                : hi ? "खरमास नहीं।" : "Not Kharmas."}
+              {" "}
+              {holashtak
+                ? hi ? "होलाष्टक। विवाह और नई शुरुआत टालें।" : "Holashtak. Hold a wedding and a fresh start."
+                : hi ? "होलाष्टक नहीं।" : "Not Holashtak."}
+            </p>
+            {travel ? (
+              <p className="mt-2">
+                {hi
+                  ? `दिशाशूल: ${nm(p.vara.name)} को ${disha[p.vara.name] ?? ""} दिशा की यात्रा टालें।`
+                  : `Disha shool: on ${p.vara.name} avoid travel toward the ${disha[p.vara.name] ?? "marked"} direction.`}
+              </p>
+            ) : (
+              <p className="mt-2">{hi ? "दिशाशूल यात्रा के काम पर देखा जाता है। यह काम यात्रा नहीं है।" : "Disha shool is read for a journey. This work is not a journey."}</p>
+            )}
+          </div>
+          <div>
+            <p className="text-xs uppercase tracking-widest text-[#d4b15a]">{hi ? "3 · इस खिड़की को कैसे पढ़ें" : "3 · How to read this window"}</p>
+            <p className="mt-2">
+              {hi
+                ? `शुरुआत की 15 मिनट ${start}–${q15} है। ${golden ? "यह गोल्डन विंडो है। नवतार, चंद्रबल, मुख्य आधा, पक्षी और बंद सूत्र सब मिल गए। यहीं शुरू करें।" : "गोल्डन नहीं। गोल्डन तभी जब नवतार मित्र हो, चंद्रबल साथ दे, मुख्य आधा हो, पक्षी शासन या भोजन में हो, और राहु, यम, माण्डी, पंचक, भद्रा, खराब चौघड़िया न हों।"}`
+                : `The first 15 minutes are ${start}–${q15}. ${golden ? "This is the golden window. Navtara, the Moon, the first half, the bird and the closed sutras all agree. Start here." : "Not golden. Golden needs a friend navtara, a supporting Moon, the first half, the bird Ruling or Eating, and no Rahu, Yam, Mandi, Panchak, Bhadra or a bad choghadiya."}`}
+            </p>
+            <p className="mt-2">
+              {hi
+                ? `आपका पक्षी ${birdHi[bird.bird] ?? bird.bird} है। इस घंटे में यह ${actHi[bird.activity] ?? bird.activity}। याम ${bird.yama}, ${bird.dayHalf === "Day" ? "दिन" : "रात"}। ${birdHelps ? "यह काम के साथ है।" : "यह काम के साथ नहीं है।"}`
+                : `Your bird is the ${bird.bird}. This hour it is ${actEn[bird.activity] ?? bird.activity}. Yama ${bird.yama}, ${bird.dayHalf.toLowerCase()}. ${birdHelps ? "It supports the work." : "It does not support the work."}`}
+            </p>
+            <p className="mt-2 text-[#cbb892]">
+              <Link to="/pakshi" className="underline">{hi ? "पक्षी का पूरा चक्र" : "Full bird clock"}</Link>
+              {" · "}
+              <Link to="/profile" className="underline">{hi ? "ऐप कैसे चलता है" : "How to use the app"}</Link>
+            </p>
+          </div>
+        </div>
+
+        <LimbPress
+          hi={hi}
+          lang={lang}
+          on={limbOn}
+          setOn={setLimbOn}
+          rows={[
+            { id: "Tithi", label: hi ? "तिथि" : "Tithi", title: nm(p.tithi.name), body: limbEffect("tithi", p.tithi.name, lang) },
+            { id: "Vaar", label: hi ? "वार" : "Vaar", title: nm(p.vara.name), body: limbEffect("vara", p.vara.name, lang) },
+            { id: "Karana", label: hi ? "करण" : "Karana", title: nm(p.karana.name), body: limbEffect("karana", p.karana.name, lang) },
+            { id: "Hora", label: hi ? "होरा" : "Hora", title: nm(p.horaLord), body: limbEffect("hora", p.horaLord, lang) },
+            {
+              id: "Uphora",
+              label: hi ? "उपहोरा" : "Uphora",
+              title: firstHalf ? (hi ? "मुख्य" : "Mukhya") : (hi ? "उपहोरा" : "Uphora"),
+              body: firstHalf
+                ? hi
+                  ? `${nm(p.horaLord)} का पहला आधा। यही भारी समय है, ${halfA} से ${halfB}।`
+                  : `First half of ${nm(p.horaLord)}. This half weighs more, ${halfA} to ${halfB}.`
+                : hi
+                  ? `${nm(p.horaLord)} का दूसरा आधा। वही ग्रह, असर हल्का, ${halfA} से ${halfB}।`
+                  : `Second half of ${nm(p.horaLord)}. Same planet, lighter effect, ${halfA} to ${halfB}.`,
+            },
+            {
+              id: "Navtara",
+              label: hi ? "नवतार" : "Navtara",
+              title: nm(result.tara.name),
+              body: result.tara.isShubh
+                ? hi
+                  ? "नवतार में यह नक्षत्र मित्र है। इस नक्षत्र को बाकी से ऊपर रखें।"
+                  : "In Navtara this star is a friend. Keep this star above the others."
+                : hi
+                  ? "नवतार में यह नक्षत्र अमित्र है। इस नक्षत्र में सावधान रहें।"
+                  : "In Navtara this star is not a friend. Treat this star as an alert.",
+            },
+            {
+              id: "Maas",
+              label: hi ? "मास" : "Maas",
+              title: nm(amantaMonth(p.nakshatra.index)),
+              body: hi
+                ? "यह चांद्र मास है। मुहूर्त इसी मास के दिन में गिना गया है।"
+                : "This is the lunar month. The muhurat is counted inside this month.",
+            },
+            {
+              id: "Paksha",
+              label: hi ? "पक्ष" : "Paksha",
+              title: nm(p.tithi.paksha),
+              body:
+                p.tithi.paksha === "Shukla"
+                  ? hi
+                    ? "शुक्ल पक्ष। चंद्र बढ़ रहा है। नई शुरुआत को साथ मिलता है।"
+                    : "Bright fortnight. The Moon is growing. A new start is supported."
+                  : hi
+                    ? "कृष्ण पक्ष। चंद्र घट रहा है। पुराना काम पूरा करें। नई शुरुआत हल्की रखें।"
+                    : "Dark fortnight. The Moon is waning. Finish old work. Keep a new start light.",
+            },
+            {
+              id: "Chandra",
+              label: hi ? "चंद्रबल" : "Chandra",
+              title: String(result.chandra.distance),
+              body: result.chandra.isShubh
+                ? hi
+                  ? `चंद्रबल ${result.chandra.distance}। बल 1, 3, 6, 7, 10, 11 में है। छठी भी बल है, उसे नहीं टाला जाता।`
+                  : `Chandrabala ${result.chandra.distance}. Bala is 1, 3, 6, 7, 10, 11. The 6th is kept.`
+                : hi
+                  ? `चंद्रबल ${result.chandra.distance}। 2, 4, 5, 8, 9, 12 में बल नहीं। खिड़की काटी नहीं गई।`
+                  : `Chandrabala ${result.chandra.distance}. No bala in 2, 4, 5, 8, 9, 12. The window is not dropped.`,
+            },
+            {
+              id: "Tarabal",
+              label: hi ? "ताराबल" : "Tarabal",
+              title: `${nm(result.tara.name)} · ${result.tara.count}`,
+              body: hi
+                ? `ताराबल गणना ${result.tara.count}, आवृत्ति ${result.tara.avritti}। ${result.tara.isShubh ? "बल साथ में है।" : "बल विपरीत है।"}`
+                : `Tarabala count ${result.tara.count}, cycle ${result.tara.avritti}. ${result.tara.isShubh ? "The strength is with you." : "The strength is against this hour."}`,
+            },
+          ]}
+        />
 
         <details className="rounded-xl border border-[#d4b15a]/25 bg-[#0c1224] px-3 py-2 text-xs text-[#cbb892]">
           <summary className="cursor-pointer py-1 text-sm text-[#ffe08a]">

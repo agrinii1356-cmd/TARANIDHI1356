@@ -208,8 +208,8 @@ export function scoreMuhurat(
   const trad = act.paddhati === "traditional";
   // Traditional: panchang first. Advance: birth chart first.
   const w = trad
-    ? { panch: 0.4, navtara: 0.1, chandra: 0.06, hora: 0.14, pakshi: 0.06, gochar: 0.06, dasha: 0.06, golden: 0.12 }
-    : { panch: 0.2, navtara: 0.16, chandra: 0.1, hora: 0.1, pakshi: 0.1, gochar: 0.14, dasha: 0.14, golden: 0.06 };
+    ? { panch: 0.32, navtara: 0.1, chandra: 0.18, hora: 0.12, pakshi: 0.06, gochar: 0.06, dasha: 0.06, golden: 0.1 }
+    : { panch: 0.16, navtara: 0.16, chandra: 0.22, hora: 0.1, pakshi: 0.08, gochar: 0.12, dasha: 0.1, golden: 0.06 };
   const d9Nudge = 0;
   const natalD9 = navamsaSign(chart.lagnaIndex * 30 + 15);
   const d9From = ((mD9 - natalD9 + 12) % 12) + 1;
@@ -260,7 +260,7 @@ export function scoreMuhurat(
   reasons.push(
     chandra.isShubh
       ? `Moon is ${chandra.distance} from natal Moon (supportive)`
-      : `Moon is ${chandra.distance} from natal Moon (dusthana)`,
+      : `Moon is ${chandra.distance} from natal Moon (no Chandra Bala: 2, 4, 5, 8, 9, 12). The window is kept.`,
   );
   reasons.push(`Vimshottari ${dasha.maha}–${dasha.antar}`);
   reasons.push(extra.notes[0] ?? "Suryabala");
@@ -413,17 +413,21 @@ export function searchMuhurats(opts: {
   const fit = (s: ScoreResult) => {
     const act = getActivity(s.activityKey);
     let n = s.finalScore;
+    if (s.navtaraFlag === "priority") n += 12;
     if (act?.preferredNakshatra.includes(s.panchang.nakshatra.name)) n += 18;
     if (act?.karaka.includes(s.panchang.horaLord)) n += 8;
     if (act?.preferredVara.includes(s.panchang.vara.name)) n += 6;
     if (s.panchang.uphora.half === 1) n += 3;
+    if (s.chandra.isShubh) n += 14;
+    else n -= 8;
+    if (s.panchang.golden.sarvarthaSiddhi || s.panchang.golden.amritSiddhi) n += 6;
     return n;
   };
   const priority = bestPerStar(
-    slots.filter((s) => s.navtaraFlag === "priority" && open(s) && s.finalScore >= min - 8),
+    slots.filter((s) => s.navtaraFlag !== "alert" && open(s) && s.finalScore >= min - 8),
   )
     .sort((a, b) => fit(b) - fit(a) || b.finalScore - a.finalScore)
-    .slice(0, opts.maxResults ?? 1);
+    .slice(0, opts.maxResults ?? 3);
   const alerts = bestPerStar(
     slots.filter((s) => s.navtaraFlag === "alert" || s.sutra.blocks.length > 0),
   )

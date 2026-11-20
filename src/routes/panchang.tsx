@@ -28,6 +28,7 @@ function PanchangPage() {
   const { lang } = useT();
   const [date, setDate] = useState(todayISODate());
   const [tab, setTab] = useState<LimbTab>("Tithi");
+  const [focus, setFocus] = useState("Tithi");
   const [open, setOpen] = useState<string | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
 
@@ -122,7 +123,7 @@ function PanchangPage() {
           <p className="text-xs text-muted">{tx("Chandra Bala", "चंद्र बल")}</p>
           <p className="mt-1 font-display text-2xl">{chandra.distance}{tx("th", "वाँ")}</p>
           <Badge className="mt-2" tone={chandra.isShubh ? "good" : "bad"}>
-            {chandra.isShubh ? tx("Moon strong", "चंद्र अनुकूल") : tx("Dusthana Moon", "चंद्र अष्टम")}
+            {chandra.isShubh ? tx("Chandra Bala", "चंद्रबल है") : tx("No Chandra Bala", "चंद्रबल नहीं")}
           </Badge>
         </Card>
       </div>
@@ -191,6 +192,63 @@ function PanchangPage() {
             </p>
           </div>
         ) : null}
+        <div className="mt-4">
+          <p className="text-sm font-medium">
+            {lang === "hi" ? "अंग दबाएँ। प्रभाव नीचे खुलेगा।" : "Press a limb. The effect opens below."}
+          </p>
+          <div className="mt-2 flex flex-wrap gap-2">
+            {TABS.map((id) => (
+              <button
+                key={id}
+                type="button"
+                onClick={() => {
+                  setTab(id);
+                  setFocus(id);
+                  setOpen(null);
+                }}
+                className={
+                  focus === id
+                    ? "min-h-10 rounded-full bg-ink px-3 text-sm text-bg"
+                    : "min-h-10 rounded-full border border-line px-3 text-sm"
+                }
+              >
+                {lang === "hi" ? TAB_HI[id] : id}
+              </button>
+            ))}
+            {(
+              [
+                ["Uphora", "उपहोरा"],
+                ["Navtara", "नवतार"],
+                ["Maas", "मास"],
+                ["Paksha", "पक्ष"],
+                ["Chandra", "चंद्रबल"],
+                ["Tarabal", "ताराबल"],
+              ] as const
+            ).map(([id, hiLabel]) => (
+              <button
+                key={id}
+                type="button"
+                onClick={() => setFocus(id)}
+                className={
+                  focus === id
+                    ? "min-h-10 rounded-full bg-ink px-3 text-sm text-bg"
+                    : "min-h-10 rounded-full border border-line px-3 text-sm"
+                }
+              >
+                {lang === "hi" ? hiLabel : id}
+              </button>
+            ))}
+          </div>
+          <LimbNow
+            focus={focus}
+            lang={lang}
+            p={p}
+            tara={tara}
+            chandra={chandra}
+            month={place.month}
+            rows={rowsFor(tab, span, horas, p.vara.name, marks, p.abhijit)}
+          />
+        </div>
         <div className="mt-4 flex items-center justify-between gap-2">
           <p className="min-w-0 truncate text-sm font-medium">
             {lang === "hi" ? TAB_HI[tab] : tab}
@@ -333,6 +391,91 @@ function PanchangPage() {
           <Row k={tx("Sun rashi", "सूर्य राशि")} v={nm(p.sunRashi.name)} />
         </dl>
       </Card>
+    </div>
+  );
+}
+
+function LimbNow({
+  focus,
+  lang,
+  p,
+  tara,
+  chandra,
+  month,
+  rows,
+}: {
+  focus: string;
+  lang: "hi" | "en";
+  p: ReturnType<typeof getPanchang>;
+  tara: ReturnType<typeof calculateTaraBala>;
+  chandra: ReturnType<typeof calculateChandraBala>;
+  month: string;
+  rows: { name: string; effectName: string; from: string; until: string; half: string }[];
+}) {
+  const hi = lang === "hi";
+  const nm = (name: string) => localName(name, lang);
+  const now = Date.now();
+  const live = rows.find((row) => new Date(row.from).getTime() <= now && now < new Date(row.until).getTime()) ?? rows[0];
+  let title = live ? nm(live.name) : focus;
+  let body = live ? limbEffect(KIND[focus as LimbTab] ?? "tithi", live.effectName, lang) : "";
+  if (focus === "Uphora") {
+    title = p.uphora.label === "Mukhya" ? (hi ? "मुख्य" : "Mukhya") : hi ? "उपहोरा" : "Uphora";
+    body =
+      p.uphora.half === 1
+        ? hi
+          ? `${nm(p.horaLord)} का पहला आधा अभी चल रहा है। यही भारी समय है।`
+          : `The first half of ${nm(p.horaLord)} is open now. This half weighs more.`
+        : hi
+          ? `${nm(p.horaLord)} का दूसरा आधा चल रहा है। वही ग्रह, असर हल्का।`
+          : `The second half of ${nm(p.horaLord)} is open. Same planet, lighter effect.`;
+  } else if (focus === "Navtara") {
+    title = nm(tara.name);
+    body = tara.isShubh
+      ? hi
+        ? "नवतार में यह नक्षत्र मित्र है। इस नक्षत्र को बाकी से ऊपर रखें।"
+        : "In Navtara this star is a friend. Keep this star above the others."
+      : hi
+        ? "नवतार में यह नक्षत्र अमित्र है। इस नक्षत्र में सावधान रहें।"
+        : "In Navtara this star is not a friend. Treat this star as an alert.";
+  } else if (focus === "Maas") {
+    title = nm(month);
+    body = hi
+      ? "यह चांद्र मास है। आज का पंचांग इसी मास में गिना गया है।"
+      : "This is the lunar month. Today's panchang is counted inside it.";
+  } else if (focus === "Paksha") {
+    title = nm(p.tithi.paksha);
+    body =
+      p.tithi.paksha === "Shukla"
+        ? hi
+          ? "शुक्ल पक्ष। चंद्र बढ़ रहा है। नई शुरुआत को साथ मिलता है।"
+          : "Bright fortnight. The Moon is growing. A new start is supported."
+        : hi
+          ? "कृष्ण पक्ष। चंद्र घट रहा है। पुराना काम पूरा करें। नई शुरुआत हल्की रखें।"
+          : "Dark fortnight. The Moon is waning. Finish old work. Keep a new start light.";
+  } else if (focus === "Chandra") {
+    title = String(chandra.distance);
+    body = chandra.isShubh
+      ? hi
+        ? `चंद्रबल ${chandra.distance}। 1, 3, 6, 7, 10, 11 बल है। छठी को नहीं टाला जाता।`
+        : `Chandrabala ${chandra.distance}. Bala is 1, 3, 6, 7, 10, 11. The 6th is not avoided.`
+      : hi
+        ? `चंद्रबल ${chandra.distance}। 2, 4, 5, 8, 9, 12 में बल नहीं। समय काटा नहीं जाता।`
+        : `Chandrabala ${chandra.distance}. No bala in 2, 4, 5, 8, 9, 12. The hour is not dropped.`;
+  } else if (focus === "Tarabal") {
+    title = `${nm(tara.name)} · ${tara.count}`;
+    body = hi
+      ? `ताराबल गणना ${tara.count}, आवृत्ति ${tara.avritti}। ${tara.isShubh ? "बल साथ में है।" : "बल विपरीत है।"}`
+      : `Tarabala count ${tara.count}, cycle ${tara.avritti}. ${tara.isShubh ? "The strength is with you." : "The strength is against this hour."}`;
+  }
+  return (
+    <div className="mt-3 rounded-xl border border-line bg-surface-2 px-4 py-3">
+      <p className="font-display text-2xl">{title}</p>
+      {live && !["Uphora", "Navtara", "Maas", "Paksha", "Chandra", "Tarabal"].includes(focus) ? (
+        <p className="mt-1 text-sm tabular-nums text-muted">
+          {formatTime(live.from)} – {formatTime(live.until)}
+        </p>
+      ) : null}
+      <p className="mt-2 text-base leading-relaxed">{body}</p>
     </div>
   );
 }

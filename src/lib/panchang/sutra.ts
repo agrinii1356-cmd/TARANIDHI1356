@@ -44,6 +44,17 @@ const CHOGHADIYA = ["Amrit", "Kaal", "Shubh", "Rog", "Labh", "Udveg", "Char"] as
 const CHOGHADIYA_START = [5, 0, 3, 4, 2, 6, 1];
 const BAD_CHOGHADIYA = new Set(["Rog", "Kaal", "Udveg"]);
 
+/** Daytime choghadiya. Night returns null; the day cycle is the one used as a gate. */
+export function choghadiyaAt(sunriseIso: string, sunsetIso: string, local: Date): { name: string; good: boolean } | null {
+  const sunrise = new Date(sunriseIso);
+  const sunset = new Date(sunsetIso);
+  if (!(local >= sunrise && local < sunset)) return null;
+  const seg = (sunset.getTime() - sunrise.getTime()) / 8;
+  const part = Math.min(7, Math.floor((local.getTime() - sunrise.getTime()) / seg));
+  const name = CHOGHADIYA[(CHOGHADIYA_START[local.getDay()] + part) % 7];
+  return { name, good: !BAD_CHOGHADIYA.has(name) };
+}
+
 export type SutraReading = {
   blocks: string[];
   cautions: string[];

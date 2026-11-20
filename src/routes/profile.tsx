@@ -7,12 +7,15 @@ import { navamsaSign } from "@/lib/panchang/gates";
 import { RASHIS } from "@/lib/panchang/constants";
 import { chartFromProfile, useProfile, type Profile } from "@/lib/panchang/store";
 import {
-  MAX_PROFILES,
-  MONTHLY_INR,
-  YEARLY_INR,
-  YEARLY_LIST_INR,
+  TIER_CHARTS,
+  TIER_MONTH,
+  chartAllowance,
+  daysLeft,
+  makeActivationKey,
   planAccess,
+  tierYear,
   useBilling,
+  type Tier,
 } from "@/lib/billing";
 import { usePrefs, useT } from "@/lib/prefs";
 import { UpiPay } from "@/components/upi-pay";
@@ -41,7 +44,12 @@ function ProfilePage() {
   const [adding, setAdding] = useState(false);
   const [saved, setSaved] = useState(false);
   const [limit, setLimit] = useState(false);
-  const [payPlan, setPayPlan] = useState<"month" | "year" | null>(null);
+  const [payPlan, setPayPlan] = useState<{ tier: Tier; span: "month" | "year" } | null>(null);
+  const [keyText, setKeyText] = useState("");
+  const [keyMsg, setKeyMsg] = useState("");
+  const [madeKey, setMadeKey] = useState("");
+  const [keyTier, setKeyTier] = useState<Tier>("premium");
+  const [keyDays, setKeyDays] = useState(365);
   if (!profile) return null;
   const chart = chartFromProfile(profile);
   const dasha = dashaFor(chart, new Date());
@@ -159,7 +167,7 @@ function ProfilePage() {
                 setLimit(false);
               }}
             >
-              {t("addChart")} · {profiles.length}/{MAX_PROFILES}
+              {t("addChart")} · {profiles.length}/{chartAllowance(billing)}
             </Button>
             <Button variant="ghost" className="mt-2 w-full" onClick={() => clear()}>
               Reset all details
@@ -178,44 +186,121 @@ function ProfilePage() {
         <p className="mt-2 font-display text-3xl">
           {access.kind === "paid"
             ? lang === "hi"
-              ? "प्लान चालू"
-              : "Plan active"
+              ? `${billing.tier === "platinum" ? "प्लेटिनम" : billing.tier === "basic" ? "बेसिक" : "प्रीमियम"} चालू`
+              : `${billing.tier === "platinum" ? "Platinum" : billing.tier === "basic" ? "Basic" : "Premium"} active`
             : access.kind === "demo"
               ? t("demo")
               : lang === "hi"
                 ? "डेमो खत्म"
                 : "Demo ended"}
         </p>
-        <p className="mt-2 text-sm text-muted">
+        <p className="mt-2 text-base">
           {access.until
-            ? new Date(access.until).toLocaleDateString(lang === "hi" ? "hi-IN" : "en-IN", {
-                day: "numeric",
-                month: "short",
-                year: "numeric",
-              })
+            ? lang === "hi"
+              ? `वैधता ${new Date(access.until).toLocaleDateString("hi-IN", { day: "numeric", month: "short", year: "numeric" })} तक · ${daysLeft(access.until)} दिन बाकी · कुंडली ${chartAllowance(billing)}`
+              : `Valid until ${new Date(access.until).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })} · ${daysLeft(access.until)} days left · ${chartAllowance(billing)} charts`
             : lang === "hi"
-              ? "तीन दिन मुफ्त। उसके बाद ₹369 महीना, या साल का प्लान 20% कम।"
-              : "Three days free. Then ₹369 a month, or a year at 20% off."}
+              ? "तीन दिन का डेमो, एक कुंडली। उसके बाद चाबी या UPI।"
+              : "Three-day demo, one chart. Then a key or UPI."}
         </p>
-        <div className="mt-4 grid gap-2 sm:grid-cols-2">
-          <Button variant="secondary" onClick={() => setPayPlan("month")}>
-            {t("month")} · ₹{MONTHLY_INR}
-          </Button>
-          <Button variant="secondary" onClick={() => setPayPlan("year")}>
-            {t("year")} · ₹{YEARLY_INR}
-            <span className="ml-1 text-xs text-muted">₹{YEARLY_LIST_INR}</span>
-          </Button>
+        <p className="mt-1 text-sm text-muted">
+          {lang === "hi"
+            ? "बेसिक 1 कुंडली · प्रीमियम 3 · प्लेटिनम 10। साल पर 20% कम।"
+            : "Basic 1 chart · Premium 3 · Platinum 10. A year is 20% less."}
+        </p>
+        <div className="mt-4 grid gap-2">
+          {(["basic", "premium", "platinum"] as const).map((tier) => (
+            <div key={tier} className="grid grid-cols-2 gap-2">
+              <Button variant="secondary" onClick={() => setPayPlan({ tier, span: "month" })}>
+                {tier} · ₹{TIER_MONTH[tier]}
+                <span className="ml-1 text-xs text-muted">{TIER_CHARTS[tier]}</span>
+              </Button>
+              <Button variant="secondary" onClick={() => setPayPlan({ tier, span: "year" })}>
+                {lang === "hi" ? "साल" : "year"} · ₹{tierYear(tier)}
+              </Button>
+            </div>
+          ))}
         </div>
         {payPlan ? (
           <UpiPay
-            amount={payPlan === "month" ? MONTHLY_INR : YEARLY_INR}
-            note={payPlan === "month" ? "TaraNidhi monthly" : "TaraNidhi yearly"}
+            amount={payPlan.span === "month" ? TIER_MONTH[payPlan.tier] : tierYear(payPlan.tier)}
+            note={`TaraNidhi ${payPlan.tier} ${payPlan.span}`}
             onPaid={() => {
-              billing.activate(payPlan);
+              billing.activate(payPlan.span, payPlan.tier);
               setPayPlan(null);
             }}
           />
         ) : null}
+        <label className="mt-6 block text-sm">
+          {lang === "hi" ? "ऐक्टिवेशन चाबी" : "Activation key"}
+          <input
+            value={keyText}
+            onChange={(e) => setKeyText(e.target.value)}
+            placeholder="TN-PRE-365-...."
+            className="mt-1 w-full rounded-xl border border-line bg-surface px-3 py-3 text-base uppercase"
+          />
+        </label>
+        <Button
+          className="mt-2 w-full"
+          onClick={() => {
+            const ok = billing.activateKey(keyText);
+            setKeyMsg(
+              ok
+                ? lang === "hi"
+                  ? "चाबी लग गई। वैधता ऊपर लिखी है।"
+                  : "Key accepted. The validity is written above."
+                : lang === "hi"
+                  ? "यह चाबी नहीं खुली। अक्षर जाँचें।"
+                  : "This key did not open. Check the letters.",
+            );
+          }}
+        >
+          {lang === "hi" ? "चाबी लगाएँ" : "Activate key"}
+        </Button>
+        {keyMsg ? <p className="mt-2 text-sm">{keyMsg}</p> : null}
+        <div className="mt-6 border-t border-line pt-4">
+          <p className="text-sm font-medium">
+            {lang === "hi" ? "क्लाइंट के लिए चाबी बनाएँ" : "Make a key for a client"}
+          </p>
+          <div className="mt-2 flex flex-wrap gap-2">
+            {(["basic", "premium", "platinum"] as const).map((tier) => (
+              <button
+                key={tier}
+                type="button"
+                onClick={() => setKeyTier(tier)}
+                className={
+                  keyTier === tier
+                    ? "min-h-10 rounded-full bg-ink px-3 text-sm text-bg"
+                    : "min-h-10 rounded-full border border-line px-3 text-sm"
+                }
+              >
+                {tier} · {TIER_CHARTS[tier]}
+              </button>
+            ))}
+            {[30, 365].map((days) => (
+              <button
+                key={days}
+                type="button"
+                onClick={() => setKeyDays(days)}
+                className={
+                  keyDays === days
+                    ? "min-h-10 rounded-full bg-ink px-3 text-sm text-bg"
+                    : "min-h-10 rounded-full border border-line px-3 text-sm"
+                }
+              >
+                {days} {lang === "hi" ? "दिन" : "days"}
+              </button>
+            ))}
+          </div>
+          <Button
+            variant="secondary"
+            className="mt-3 w-full"
+            onClick={() => setMadeKey(makeActivationKey(keyTier, keyDays))}
+          >
+            {lang === "hi" ? "चाबी निकालें" : "Generate key"}
+          </Button>
+          {madeKey ? <p className="mt-2 break-all font-mono text-base">{madeKey}</p> : null}
+        </div>
       </Card>
 
       <Card>
@@ -235,11 +320,22 @@ function ProfilePage() {
         </ul>
       </Card>
       <Card>
+        <h2 className="font-display text-xl">{lang === "hi" ? "ऐप कैसे चलता है" : "How to use the app"}</h2>
+        <ol className="mt-3 list-decimal space-y-2 pl-5 text-sm leading-relaxed">
+          <li>{lang === "hi" ? "निधि में जन्म तिथि, समय और शहर सेव करें। बेसिक में एक कुंडली, प्रीमियम में तीन, प्लेटिनम में दस।" : "In Nidhi, save birth date, time and city. Basic keeps one chart, Premium three, Platinum ten."}</li>
+          <li>{lang === "hi" ? "मुहूर्त में काम चुनें। तारीख और Submit उसी के नीचे हैं। सूची के बाद स्क्रॉल नहीं करना।" : "On Muhurat, pick the work. The dates and Submit sit under it. You do not scroll past the list."}</li>
+          <li>{lang === "hi" ? "तीन शुभ मुहूर्त आते हैं। कार्ड पर 1 अंग, 2 सावधानी, 3 पढ़ने का तरीका। गोल्डन तभी जब नवतार, चंद्रबल, मुख्य आधा, पक्षी और बंद सूत्र एक साथ मिलें।" : "Three open muhurats come back. The card has 1 limbs, 2 cautions, 3 how to read. Golden needs the navtara, the Moon, the first half, the bird and a clear sutra together."}</li>
+          <li>{lang === "hi" ? "अंग का बटन दबाने पर उसका प्रभाव खुलता है: तिथि, वार, होरा, उपहोरा, नवतार, पक्ष, चंद्रबल, ताराबल।" : "Press a limb and its effect opens: tithi, weekday, hora, uphora, navtara, paksha, chandrabala, tarabala."}</li>
+          <li>{lang === "hi" ? "पक्षी टैब उसी घंटे का पक्षी दिखाता है। मुहूर्त कार्ड से भी खुलता है।" : "The Pakshi tab shows that hour's bird. The muhurat card opens it too."}</li>
+          <li>{lang === "hi" ? "डेमो तीन दिन। उसके बाद निधि में चाबी लगाएँ, या UPI से प्लान चालू करें। वैधता ऊपर लिखी रहती है।" : "The demo is three days. Then enter a key in Nidhi, or turn a plan on with UPI. The validity stays written above."}</li>
+        </ol>
+      </Card>
+      <Card>
         <h2 className="font-display text-xl">{t("method")}</h2>
         <p className="mt-3 text-sm leading-relaxed text-muted">
           {lang === "hi"
-            ? "नंबर आठ हिस्सों का है। पंचांग 26%, नवतारा 14%, चंद्र बल 8%, होरा और उपहोरा 12%, पंचपक्षी 12%, गोचर 12%, दशा 10%, अमृत या सर्वार्थ सिद्धि 6%। सत्ताईस योग में से सत्रह साथ देते हैं और दस त्याज्य योग खिड़की बंद कर देते हैं। शुभ नवतारा भी तब सुझाव नहीं बनता जब त्याज्य योग, राहु काल, यमगंड, माण्डी, भद्रा, वर्ज्य, दग्ध या विष तिथि, गंडांत या आठवाँ लग्न चल रहा हो।"
-            : "Eight parts make the number. Panchang 26%, Navtara 14%, Chandra Bala 8%, hora and uphora 12%, Panchpakshi 12%, gochar 12%, dasha 10%, Amrit or Sarvartha Siddhi 6%. Seventeen of the twenty-seven yogas support a start. The other ten close the window. A beneficial Navtara is still refused while a tyajya yoga, Rahu Kaal, Yamaganda, Mandi, Bhadra, Varjyam, Dagdha or Visha tithi, Gandanta or the 8th lagna is open."}
+            ? "नंबर आठ हिस्सों का है। एडवांस में चंद्रबल 22% है, सबसे भारी हिस्सा। बल जन्म राशि से 1, 3, 6, 7, 10, 11 पर है। छठी को नहीं टाला जाता। बल न हो तो खिड़की रहती है, नंबर नीचे आता है। पंचांग 16%, नवतारा 16%, होरा 10%, पक्षी 8%, गोचर 12%, दशा 10%, योग 6%।"
+            : "Eight parts make the number. In Advance, Chandra Bala is 22%, the heaviest part. Bala is 1, 3, 6, 7, 10 and 11 from the birth sign. The 6th is not avoided. Without bala the window stays and the number falls. Panchang 16%, Navtara 16%, hora 10%, bird 8%, gochar 12%, dasha 10%, yoga 6%."}
         </p>
       </Card>
 
