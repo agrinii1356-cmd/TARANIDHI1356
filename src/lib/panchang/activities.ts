@@ -40,18 +40,18 @@ export const CATEGORIES = [
   "Business",
   "Marketing",
   "Finance",
+  "Legal",
+  "Technology",
+  "Media",
+  "Civic",
   "Health",
   "Travel",
   "Purchase",
   "Real Estate",
-  "Relationship",
-  "Family",
-  "Education",
-  "Legal",
-  "Civic",
-  "Media",
-  "Technology",
   "Daily",
+  "Education",
+  "Family",
+  "Relationship",
   "Spiritual",
 ] as const;
 
@@ -354,6 +354,12 @@ export const ACTIVITIES: Activity[] = [
   ...(CATALOG as Activity[]).map((a) => ({ ...a, paddhati: "advance" as const })),
   ...TRADITIONAL,
 ];
+
+export function isHeld(a: { key: string; category: string; name?: string }): boolean {
+  if (a.category === "Marriage") return true;
+  if (a.key === "marriage" || a.key === "vivah_muhurat" || a.key === "engagement" || a.key === "engagement_ceremony") return true;
+  return /wedding|engagement|roka|vidai|vivah|swayamvar/i.test(`${a.key} ${a.name ?? ""}`);
+}
 
 export function getActivity(key: string): Activity | undefined {
   return ACTIVITIES.find((a) => a.key === key);

@@ -91,15 +91,53 @@ const FAMILIES: Family[] = [
     { en: "start task", hi: "काम शुरू" }, { en: "deep work", hi: "गहन काम" }, { en: "review day", hi: "दिन समीक्षा" },
     { en: "pay bill", hi: "बिल" }, { en: "schedule", hi: "शेड्यूल" },
   ], vara: ["Wednesday", "Thursday", "Friday"], stars: ["Hasta", "Pushya"], karaka: ["Mercury"], avoid: [4, 9], minTara: 0 },
+  { category: "Family", subs: ["Parents", "Child", "Home", "Ritual", "Visit", "Care", "School", "Gathering"], actions: [
+    { en: "call parents", hi: "माता-पिता को कॉल" }, { en: "school drop", hi: "स्कूल छोड़ना" }, { en: "doctor with child", hi: "बच्चे के साथ डॉक्टर" },
+    { en: "family lunch", hi: "परिवार का भोजन" }, { en: "home puja", hi: "घर की पूजा" }, { en: "visit elders", hi: "बड़ों से मिलना" },
+    { en: "tuition start", hi: "ट्यूशन शुरू" }, { en: "birthday plan", hi: "जन्मदिन योजना" },
+  ], vara: ["Monday", "Thursday", "Friday"], stars: ["Rohini", "Pushya", "Revati"], karaka: ["Moon", "Jupiter"], avoid: [4, 9, 14], minTara: 2 },
 ];
+
+const MORE_SUBS: Record<string, string[]> = {
+  Career: ["Resume", "Referral"],
+  Business: ["Invoice", "Follow-up"],
+  Marketing: ["Reel", "Landing"],
+  Finance: ["EMI", "FD"],
+  Health: ["Diet", "Report"],
+  Travel: ["Cab", "Return ticket"],
+  Purchase: ["Invoice", "Service"],
+  "Real Estate": ["Loan", "Interior"],
+  Relationship: ["Dating", "Talk"],
+  Education: ["Fee", "Interview"],
+  Legal: ["Stamp", "Bail"],
+  Technology: ["Backup", "Invoice"],
+  Media: ["Thumbnail", "Live"],
+  Civic: ["Affidavit", "Slot"],
+  Spiritual: ["Jap", "Visit"],
+  Daily: ["Morning", "Night"],
+  Family: ["Homework", "Medicine"],
+};
+
+const MORE_ACTS: { en: string; hi: string }[] = [
+  { en: "confirm time", hi: "समय पक्का" },
+  { en: "send details", hi: "विवरण भेजना" },
+  { en: "first reminder", hi: "पहली याद" },
+  { en: "final check", hi: "अंतिम जाँच" },
+  { en: "collect proof", hi: "प्रमाण लेना" },
+  { en: "share update", hi: "अपडेट भेजना" },
+];
+
+const HELD_SUB = /wedding|engagement|roka|vidai|vivah/i;
 
 function slug(s: string) {
   return s.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "");
 }
 
-export const CATALOG = FAMILIES.flatMap((f) =>
-  f.subs.flatMap((sub) =>
-    f.actions.map((act) => {
+export const CATALOG = FAMILIES.flatMap((f) => {
+  const subs = [...new Set([...f.subs, ...(MORE_SUBS[f.category] ?? [])])].filter((s) => !HELD_SUB.test(s));
+  const actions = [...f.actions, ...MORE_ACTS];
+  return subs.flatMap((sub) =>
+    actions.map((act) => {
       const key = `cat_${slug(f.category)}_${slug(sub)}_${slug(act.en)}`;
       const major = Boolean(f.major) || f.minTara >= 6;
       return {
@@ -114,11 +152,11 @@ export const CATALOG = FAMILIES.flatMap((f) =>
         karaka: f.karaka,
         blurb: `${sub} — ${act.en}. Birth star and navtara still gate the window.`,
         tier: major ? "major" : "daily",
-        purushartha: f.category === "Spiritual" ? "moksha" : f.category === "Relationship" ? "kama" : "artha",
+        purushartha: f.category === "Spiritual" ? "moksha" : f.category === "Relationship" || f.category === "Family" ? "kama" : "artha",
         tatva: "vayu",
         guna: "rajas",
         creditCost: major ? 5 : 1,
       };
     }),
-  ),
-);
+  );
+});

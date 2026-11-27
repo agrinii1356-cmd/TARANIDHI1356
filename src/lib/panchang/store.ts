@@ -7,6 +7,8 @@ import { getBirthChart, type BirthChart } from "./engine";
 export type Profile = {
   id?: string;
   name: string;
+  email: string;
+  whatsapp: string;
   date: string;
   time: string;
   city: string;
@@ -137,6 +139,66 @@ export function dobFromProfile(p: Profile): Date {
 
 export function chartFromProfile(p: Profile): BirthChart {
   return getBirthChart(dobFromProfile(p), p.lat, p.lon, p.tz);
+}
+
+export type AccountRow = {
+  name: string;
+  email: string;
+  whatsapp: string;
+  city: string;
+  plan: string;
+  at: string;
+};
+
+const LEDGER_KEY = "taranidhi-ledger";
+const SCRIPT_KEY = "taranidhi-script-url";
+const LEDGER_TOKEN = "tn-ledger-v1";
+
+export function scriptUrl(): string {
+  if (typeof window === "undefined") return "";
+  return window.localStorage.getItem(SCRIPT_KEY) ?? "";
+}
+
+export function saveScriptUrl(url: string) {
+  if (typeof window === "undefined") return;
+  window.localStorage.setItem(SCRIPT_KEY, url.trim());
+}
+
+function pushAccount(row: AccountRow) {
+  const url = scriptUrl();
+  if (!url || typeof fetch === "undefined") return;
+  const body = JSON.stringify({ token: LEDGER_TOKEN, ...row });
+  void fetch(url, {
+    method: "POST",
+    mode: "no-cors",
+    headers: { "Content-Type": "text/plain;charset=utf-8" },
+    body,
+  }).catch(() => undefined);
+}
+
+export function readLedger(): AccountRow[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = window.localStorage.getItem(LEDGER_KEY);
+    return raw ? (JSON.parse(raw) as AccountRow[]) : [];
+  } catch {
+    return [];
+  }
+}
+
+export function rememberAccount(row: Omit<AccountRow, "at">) {
+  if (typeof window === "undefined") return;
+  const next = [...readLedger().filter((r) => r.email !== row.email || r.plan !== row.plan), { ...row, at: new Date().toISOString() }];
+  window.localStorage.setItem(LEDGER_KEY, JSON.stringify(next));
+  pushAccount(next[next.length - 1]);
+}
+
+export function ledgerCsv(): string {
+  const head = "name,email,whatsapp,city,plan,at";
+  const lines = readLedger().map((r) =>
+    [r.name, r.email, r.whatsapp, r.city, r.plan, r.at].map((c) => `"${String(c).replace(/"/g, '""')}"`).join(","),
+  );
+  return [head, ...lines].join("\n");
 }
 
 export function defaultCity() {

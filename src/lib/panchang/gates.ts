@@ -6,7 +6,7 @@
  * D9 lagna gate for major rites.
  * Abhujh: Akshaya Tritiya and Vijayadashami only.
  */
-import { planetSidereal, sunLongitude, toJulianDay, localToUtc, ascendantSidereal } from "./astronomy";
+import { planetSidereal, sunLongitude, sidereal, toJulianDay, localToUtc, ascendantSidereal } from "./astronomy";
 import { getPanchang, type BirthChart, type Panchang } from "./engine";
 import { RASHIS } from "./constants";
 
@@ -57,7 +57,7 @@ function angle(a: number, b: number): number {
 
 export function combustion(local: Date, tz: number): { venus: boolean; jupiter: boolean; venusDeg: number; jupiterDeg: number } {
   const jd = toJulianDay(localToUtc(local, tz));
-  const sun = sunLongitude(jd);
+  const sun = sidereal(sunLongitude(jd), jd);
   const venus = planetSidereal("Venus", jd);
   const jupiter = planetSidereal("Jupiter", jd);
   const venusDeg = angle(venus, sun);
@@ -68,6 +68,77 @@ export function combustion(local: Date, tz: number): { venus: boolean; jupiter: 
     venusDeg: Math.round(venusDeg * 10) / 10,
     jupiterDeg: Math.round(jupiterDeg * 10) / 10,
   };
+}
+
+/** Asta uses the Surya Siddhanta orb. The five degrees outside it are the near-asta band: closing is vriddhatva, opening is shishutva. */
+export function guruShukraBand(local: Date, tz: number): string[] {
+  const now = combustion(local, tz);
+  const next = combustion(new Date(local.getTime() + 24 * 3600000), tz);
+  const out: string[] = [];
+  const one = (name: string, deg: number, later: number, orb: number, asta: boolean) => {
+    if (asta) out.push(`${name} asta`);
+    else if (deg <= orb + 5 && later < deg) out.push(`${name} vriddhatva`);
+    else if (deg <= orb + 5) out.push(`${name} shishutva`);
+  };
+  one("Shukra", now.venusDeg, next.venusDeg, 10, now.venus);
+  one("Guru", now.jupiterDeg, next.jupiterDeg, 11, now.jupiter);
+  return out;
+}
+
+const adhikCache = new Map<string, boolean>();
+
+/** Adhik masa: the Sun stays in one rashi from one Amavasya to the next. */
+export function adhikMasa(local: Date, lat: number, lon: number, tz: number): boolean {
+  const key = `${local.getFullYear()}-${local.getMonth()}-${local.getDate()}|${lat.toFixed(2)}|${lon.toFixed(2)}`;
+  const hit = adhikCache.get(key);
+  if (hit !== undefined) return hit;
+  const marks: { at: number; sun: number }[] = [];
+  let prevNum = -1;
+  for (let d = -32; d <= 32; d++) {
+    const day = new Date(local.getFullYear(), local.getMonth(), local.getDate() + d, 12, 0, 0);
+    const p = getPanchang(day, lat, lon, tz);
+    if (p.tithi.number === 30 && prevNum !== 30) marks.push({ at: day.getTime(), sun: p.sunRashi.index });
+    prevNum = p.tithi.number;
+  }
+  const noon = new Date(local.getFullYear(), local.getMonth(), local.getDate(), 12, 0, 0).getTime();
+  let before: { sun: number } | null = null;
+  let after: { sun: number } | null = null;
+  for (const m of marks) {
+    if (m.at <= noon) before = m;
+    else if (!after) after = m;
+  }
+  const flag = !!before && !!after && before.sun === after.sun;
+  adhikCache.set(key, flag);
+  return flag;
+}
+
+const VEDHA: Record<string, string> = {
+  Ashwini: "Jyeshtha",
+  Bharani: "Anuradha",
+  Krittika: "Vishakha",
+  Rohini: "Swati",
+  Mrigashira: "Chitra",
+  Ardra: "Shravana",
+  Punarvasu: "Uttara Ashadha",
+  Pushya: "Purva Ashadha",
+  Ashlesha: "Mula",
+  Magha: "Revati",
+  "Purva Phalguni": "Uttara Bhadrapada",
+  "Uttara Phalguni": "Purva Bhadrapada",
+  Hasta: "Shatabhisha",
+};
+
+function vedhaOf(name: string): string | undefined {
+  if (VEDHA[name]) return VEDHA[name];
+  return Object.keys(VEDHA).find((k) => VEDHA[k] === name);
+}
+
+function signOf(lon: number) {
+  return Math.floor((((lon % 360) + 360) % 360) / 30) % 12;
+}
+
+function houseFromSign(sign: number, lagnaIndex: number) {
+  return ((sign - lagnaIndex + 12) % 12) + 1;
 }
 
 /** Suryabala: transit Sun from natal Sun. 8 and 12 weak. Sunday and 10th digbala support. */
@@ -179,18 +250,39 @@ export function extraGates(
     if (tier === "major") cautions.push(msg);
     else supports.push(msg);
   }
-  const asta = combustion(local, tz);
-  if (asta.venus) {
-    const msg = `Shukra asta (${asta.venusDeg}°)`;
+  const bands = guruShukraBand(local, tz);
+  for (const msg of bands) {
     if (tier === "major") blocks.push(msg);
     else cautions.push(msg);
   }
-  if (asta.jupiter) {
-    const msg = `Guru asta (${asta.jupiterDeg}°)`;
+  if (adhikMasa(local, lat, lon, tz)) {
+    const msg = "Adhik masa";
     if (tier === "major") blocks.push(msg);
     else cautions.push(msg);
+  }
+  const ahead = getPanchang(new Date(local.getTime() + 5 * 60000), lat, lon, tz);
+  if (ahead.nakshatra.name !== p.nakshatra.name || ahead.tithi.number !== p.tithi.number) {
+    blocks.push("Under 5 minutes");
   }
   const lagnaIndex = Math.floor(ascendantSidereal(local, lat, lon, tz) / 30) % 12;
+  if (/marriage|vivah|wedding/i.test(activityKey)) {
+    const jd = toJulianDay(localToUtc(local, tz));
+    const sunSign = signOf(sidereal(sunLongitude(jd), jd));
+    const moonSign = signOf(p.moonSid);
+    const marsSign = signOf(planetSidereal("Mars", jd));
+    const saturnSign = signOf(planetSidereal("Saturn", jd));
+    const sunH = houseFromSign(sunSign, lagnaIndex);
+    const moonH = houseFromSign(moonSign, lagnaIndex);
+    const marsH = houseFromSign(marsSign, lagnaIndex);
+    if (sunH === 1) blocks.push("Surya in lagna");
+    if (moonH === 7) blocks.push("Chandra in seventh");
+    if (moonH === 6) blocks.push("Chandra in sixth");
+    if (moonH === 6 || moonH === 8) blocks.push("Shadashtaka Chandra");
+    if (marsH === 1) blocks.push("Mangal in lagna");
+    if (moonSign === sunSign || moonSign === marsSign || moonSign === saturnSign) cautions.push("Yuti dosha");
+    const vedha = vedhaOf(chart.janmaNakshatra.name);
+    if (vedha && vedha === p.nakshatra.name) blocks.push("Vedha dosha");
+  }
   const surya = suryabala(local, tz, chart, lagnaIndex);
   notes.push(surya.note);
   if (surya.house === 8 || surya.house === 12) cautions.push(surya.note);

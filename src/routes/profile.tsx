@@ -1,11 +1,12 @@
 import { useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { ACTIVITIES, CATEGORIES } from "@/lib/panchang/activities";
+import { ACTIVITIES, CATEGORIES, isHeld } from "@/lib/panchang/activities";
 import { formatOffset } from "@/lib/panchang/cities";
-import { dashaFor } from "@/lib/panchang/engine";
+import { dashaFor, getBirthChart } from "@/lib/panchang/engine";
 import { navamsaSign } from "@/lib/panchang/gates";
 import { RASHIS } from "@/lib/panchang/constants";
-import { chartFromProfile, useProfile, type Profile } from "@/lib/panchang/store";
+import { localName } from "@/lib/panchang/names";
+import { chartFromProfile, ledgerCsv, rememberAccount, saveScriptUrl, scriptUrl, useProfile, type Profile } from "@/lib/panchang/store";
 import {
   TIER_CHARTS,
   TIER_MONTH,
@@ -50,6 +51,7 @@ function ProfilePage() {
   const [madeKey, setMadeKey] = useState("");
   const [keyTier, setKeyTier] = useState<Tier>("premium");
   const [keyDays, setKeyDays] = useState(365);
+  const [script, setScript] = useState(() => scriptUrl());
   if (!profile) return null;
   const chart = chartFromProfile(profile);
   const dasha = dashaFor(chart, new Date());
@@ -144,6 +146,8 @@ function ProfilePage() {
               </div>
             ) : null}
             <dl className="mt-4 space-y-3 text-sm">
+              <Row k={lang === "hi" ? "ईमेल" : "Email"} v={profile.email || "—"} />
+              <Row k={lang === "hi" ? "व्हाट्सएप" : "WhatsApp"} v={profile.whatsapp || "—"} />
               <Row k="Birth" v={`${profile.date} · ${profile.time}`} />
               <Row k="Place" v={profile.city} />
               <Row
@@ -181,6 +185,49 @@ function ProfilePage() {
         )}
       </Card>
 
+      <Card>
+        <h2 className="font-display text-xl">{lang === "hi" ? "D1 जन्म कुंडली" : "D1 birth chart"}</h2>
+        <p className="mt-1 text-sm text-muted">
+          {lang === "hi" ? "लग्न" : "Lagna"} {localName(chart.lagna, lang)} · {lang === "hi" ? "चंद्र" : "Moon"}{" "}
+          {localName(chart.janmaRashi.name, lang)} · {localName(chart.janmaNakshatra.name, lang)}
+        </p>
+        <ul className="mt-3 space-y-1 text-sm">
+          {chart.grahas.map((g) => (
+            <li key={g.name} className="flex justify-between gap-3">
+              <span>{localName(g.name, lang)}</span>
+              <span className="text-right text-muted">
+                {localName(g.rashi, lang)} · {g.houseFromLagna} · {localName(g.nakshatra, lang)} p{g.pada}
+                {g.digbal ? (lang === "hi" ? " · दिग्बल" : " · digbal") : ""}
+              </span>
+            </li>
+          ))}
+        </ul>
+      </Card>
+      <Card>
+        <h2 className="font-display text-xl">{lang === "hi" ? "D9 नवमांश" : "D9 navamsa"}</h2>
+        <p className="mt-1 text-sm text-muted">
+          D9 {lang === "hi" ? "लग्न" : "lagna"} {localName(RASHIS[navamsaSign(chart.lagnaIndex * 30 + 15)], lang)}
+        </p>
+        <ul className="mt-3 space-y-1 text-sm">
+          {chart.grahas.map((g) => (
+            <li key={g.name} className="flex justify-between gap-3">
+              <span>{localName(g.name, lang)}</span>
+              <span className="text-muted">
+                {localName(g.rashi, lang)} p{g.pada} → D9 {localName(RASHIS[navamsaSign(g.lon)], lang)}
+              </span>
+            </li>
+          ))}
+        </ul>
+      </Card>
+      <Card>
+        <h2 className="font-display text-xl">{lang === "hi" ? "इस समय का लग्न" : "Lagna of this moment"}</h2>
+        <p className="mt-1 text-sm leading-relaxed text-muted">
+          {lang === "hi"
+            ? "यह दूसरी जन्म कुंडली नहीं है। मुहूर्त में लग्न शुद्धि उसी घंटे और उसी शहर के लग्न से होती है। शास्त्र में जन्म-पत्र जैसी अलग 'मुहूर्त कुंडली' सिद्ध नहीं है। नीचे इसी क्षण का लग्न है।"
+            : "This is not a second birth chart. Muhurta reads the lagna of that hour at that place. A separate muhurta kundli, stored like a birth chart, is not an established chart. Below is the lagna of this moment."}
+        </p>
+        <MomentLagna profile={profile} lang={lang} />
+      </Card>
       <Card>
         <p className="text-xs uppercase tracking-widest text-muted">{t("plans")}</p>
         <p className="mt-2 font-display text-3xl">
@@ -227,6 +274,13 @@ function ProfilePage() {
             note={`TaraNidhi ${payPlan.tier} ${payPlan.span}`}
             onPaid={() => {
               billing.activate(payPlan.span, payPlan.tier);
+              rememberAccount({
+                name: profile.name,
+                email: profile.email || "",
+                whatsapp: profile.whatsapp || "",
+                city: profile.city,
+                plan: `${payPlan.tier}-${payPlan.span}`,
+              });
               setPayPlan(null);
             }}
           />
@@ -295,30 +349,63 @@ function ProfilePage() {
           <Button
             variant="secondary"
             className="mt-3 w-full"
-            onClick={() => setMadeKey(makeActivationKey(keyTier, keyDays))}
+            onClick={() => {
+              const key = makeActivationKey(keyTier, keyDays);
+              setMadeKey(key);
+              rememberAccount({
+                name: profile.name,
+                email: profile.email || "",
+                whatsapp: profile.whatsapp || "",
+                city: profile.city,
+                plan: `key-${keyTier}-${keyDays}`,
+              });
+            }}
           >
             {lang === "hi" ? "चाबी निकालें" : "Generate key"}
           </Button>
           {madeKey ? <p className="mt-2 break-all font-mono text-base">{madeKey}</p> : null}
+          <Button
+            variant="ghost"
+            className="mt-3 w-full"
+            onClick={() => {
+              const blob = new Blob([ledgerCsv()], { type: "text/csv" });
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement("a");
+              a.href = url;
+              a.download = "taranidhi-accounts.csv";
+              a.click();
+              URL.revokeObjectURL(url);
+            }}
+          >
+            {lang === "hi" ? "रजिस्टर की CSV डाउनलोड करें" : "Download the register CSV"}
+          </Button>
+          <label className="mt-4 block text-sm">
+            {lang === "hi" ? "Apps Script URL" : "Apps Script URL"}
+            <input
+              value={script}
+              onChange={(e) => setScript(e.target.value)}
+              placeholder="https://script.google.com/macros/s/.../exec"
+              className="mt-1 w-full rounded-xl border border-line bg-surface px-3 py-3 text-sm"
+            />
+          </label>
+          <Button
+            variant="secondary"
+            className="mt-2 w-full"
+            onClick={() => {
+              saveScriptUrl(script);
+              setKeyMsg(lang === "hi" ? "स्क्रिप्ट पता सेव हो गया। अगला रजिस्टर शीट में जाएगा।" : "Script address saved. The next register goes to the sheet.");
+            }}
+          >
+            {lang === "hi" ? "स्क्रिप्ट पता सेव करें" : "Save script address"}
+          </Button>
+          <p className="mt-2 text-sm text-muted">
+            {lang === "hi"
+              ? "बैंक भुगतान खुद नहीं बताता। UPI के बाद एक बटन इस फोन को चालू करता है। चाबी क्लाइंट को आप देते हैं। नाम, ईमेल और व्हाट्सएप इस फोन पर और CSV में रहते हैं।"
+              : "The bank does not tell this app that money arrived. After UPI, one button turns this phone on. You send the key to a client. Name, email and WhatsApp stay on this phone and in the CSV."}
+          </p>
         </div>
       </Card>
 
-      <Card>
-        <h2 className="font-display text-xl">{lang === "hi" ? "D9 ग्रह स्थिति" : "D9 planet positions"}</h2>
-        <p className="mt-1 text-sm text-muted">
-          D9 {lang === "hi" ? "लग्न" : "lagna"} {RASHIS[navamsaSign(chart.lagnaIndex * 30 + 15)]}
-        </p>
-        <ul className="mt-3 space-y-1 text-sm">
-          {chart.grahas.map((g) => (
-            <li key={g.name} className="flex justify-between gap-3">
-              <span>{g.name}</span>
-              <span className="text-muted">
-                {g.rashi} p{g.pada} → D9 {RASHIS[navamsaSign(g.lon)]}
-              </span>
-            </li>
-          ))}
-        </ul>
-      </Card>
       <Card>
         <h2 className="font-display text-xl">{lang === "hi" ? "ऐप कैसे चलता है" : "How to use the app"}</h2>
         <ol className="mt-3 list-decimal space-y-2 pl-5 text-sm leading-relaxed">
@@ -347,7 +434,7 @@ function ProfilePage() {
         <div className="mt-4 flex flex-wrap gap-2">
           {CATEGORIES.map((c) => (
             <Badge key={c} tone="neutral">
-              {c} · {ACTIVITIES.filter((a) => a.category === c).length}
+              {c} · {ACTIVITIES.filter((a) => a.category === c && !isHeld(a)).length}
             </Badge>
           ))}
         </div>
@@ -355,6 +442,40 @@ function ProfilePage() {
           Search muhurats
         </Link>
       </Card>
+    </div>
+  );
+}
+
+function wallNow(tz: number) {
+  const shifted = new Date(Date.now() + tz * 3600000);
+  return new Date(
+    shifted.getUTCFullYear(),
+    shifted.getUTCMonth(),
+    shifted.getUTCDate(),
+    shifted.getUTCHours(),
+    shifted.getUTCMinutes(),
+    shifted.getUTCSeconds(),
+  );
+}
+
+function MomentLagna({ profile, lang }: { profile: Profile; lang: "hi" | "en" }) {
+  const now = getBirthChart(wallNow(profile.tz), profile.lat, profile.lon, profile.tz);
+  return (
+    <div className="mt-3">
+      <p className="text-sm">
+        {lang === "hi" ? "लग्न" : "Lagna"} {localName(now.lagna, lang)} · D9{" "}
+        {localName(RASHIS[navamsaSign(now.lagnaIndex * 30 + 15)], lang)} · {profile.city}
+      </p>
+      <ul className="mt-2 space-y-1 text-sm">
+        {now.grahas.map((g) => (
+          <li key={g.name} className="flex justify-between gap-3">
+            <span>{localName(g.name, lang)}</span>
+            <span className="text-right text-muted">
+              {localName(g.rashi, lang)} · {g.houseFromLagna} · D9 {localName(RASHIS[navamsaSign(g.lon)], lang)}
+            </span>
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }

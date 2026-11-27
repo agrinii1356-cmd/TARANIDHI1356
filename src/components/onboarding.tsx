@@ -10,7 +10,7 @@ export function Onboarding() {
       <h1 className="mt-2 font-display text-4xl leading-tight">TaraNidhi</h1>
       <p className="mt-3 text-muted leading-relaxed">
         Universal almanacs ignore who you are. TaraNidhi scores every window against your birth
-        star, dasha, and the work itself — a call, a joining, a wedding, a launch.
+        star, dasha, and the work itself — a call, a joining, a deal, a launch. Name, email and WhatsApp are required.
       </p>
       <div className="mt-8">
         <BirthForm submitLabel="Calculate my chart" onSave={setProfile} />

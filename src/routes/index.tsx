@@ -28,7 +28,7 @@ const MAJOR = [
   { key: "company_incorporation", label: "Company" },
   { key: "movie_launch", label: "Launch" },
   { key: "election_nomination", label: "Nomination" },
-  { key: "vivah_muhurat", label: "Marriage" },
+  { key: "property_purchase", label: "Property" },
   { key: "file_case", label: "Case" },
 ];
 

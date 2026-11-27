@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Label } from "@/components/ui/input";
 import { addDaysISO, formatTime, formatWhen, todayISODate } from "@/lib/format";
-import { ACTIVITIES, CATEGORIES, getActivity, type Paddhati, type Tier } from "@/lib/panchang/activities";
+import { ACTIVITIES, CATEGORIES, getActivity, isHeld, type Paddhati, type Tier } from "@/lib/panchang/activities";
 import { PARASHAR_CATEGORIES } from "@/lib/panchang/parashar";
 import { chartFromProfile, useProfile } from "@/lib/panchang/store";
 import { refreshGps, useEventPlace, useHere } from "@/lib/panchang/here";
@@ -95,21 +95,21 @@ function MuhuratPage() {
   useEffect(() => {
     if (!qActivity) return;
     const found = ACTIVITIES.find((a) => a.key === qActivity);
-    if (!found) return;
+    if (!found || isHeld(found)) return;
     setActivity(found.key);
     setFilter(found.category);
     setTier(found.tier);
     setResults(null);
   }, [qActivity]);
 
-  const cats = paddhati === "traditional" ? PARASHAR_CATEGORIES : [...CATEGORIES];
+  const cats = (paddhati === "traditional" ? PARASHAR_CATEGORIES : [...CATEGORIES]).filter((c) => c !== "Marriage");
   const subOf = (a: { name: string; nameHi: string; paddhati: string }) =>
     a.paddhati === "advance" && a.name.includes(": ") ? a.name.split(": ")[0] : a.name;
   const subs = useMemo(() => {
     if (filter === "All") return [] as string[];
     const seen = new Set<string>();
     for (const a of ACTIVITIES) {
-      if (a.paddhati !== paddhati) continue;
+      if (isHeld(a) || a.paddhati !== paddhati) continue;
       if (a.category !== filter) continue;
       if (tier !== "all" && a.tier !== tier) continue;
       seen.add(subOf(a));
@@ -118,7 +118,7 @@ function MuhuratPage() {
   }, [filter, paddhati, tier]);
   const list = useMemo(() => {
     return ACTIVITIES.filter((a) => {
-      const padOk = a.paddhati === paddhati;
+      const padOk = a.paddhati === paddhati && !isHeld(a);
       const tierOk = tier === "all" || a.tier === tier;
       const catOk = filter === "All" || a.category === filter;
       const subOk = sub === "All" || subOf(a) === sub;
@@ -137,7 +137,7 @@ function MuhuratPage() {
   const counts = useMemo(() => {
     const out: Record<string, number> = {};
     for (const c of cats) {
-      out[c] = ACTIVITIES.filter((a) => a.paddhati === paddhati && a.category === c && (tier === "all" || a.tier === tier)).length;
+      out[c] = ACTIVITIES.filter((a) => a.paddhati === paddhati && a.category === c && !isHeld(a) && (tier === "all" || a.tier === tier)).length;
     }
     return out;
   }, [tier, paddhati, cats]);
@@ -269,8 +269,8 @@ function MuhuratPage() {
               : "Everyday work: a call, a meeting, a purchase, a resume. These happen often."
             : tier === "major"
               ? lang === "hi"
-                ? "बड़े फैसले: शादी, कंपनी, चुनाव, जॉइनिंग। साल में कुछ बार।"
-                : "Rare decisions: marriage, a company, an election, joining. A few times a year."
+                ? "बड़े फैसले: कंपनी, जॉइनिंग, चुनाव, घर। साल में कुछ बार। विवाह अभी रुका है।"
+                : "Rare decisions: a company, joining, an election, a house. A few times a year. Marriage is on hold."
               : lang === "hi"
                 ? "दोनों साथ। रोज़ के काम और बड़े फैसले एक सूची में।"
                 : "Both together. Everyday tasks and rare decisions in one list."}
@@ -286,7 +286,7 @@ function MuhuratPage() {
               onKeyDown={(e) => {
                 if (e.key === "Enter") ask();
               }}
-              placeholder={lang === "hi" ? "इंटरव्यू, शादी, चुनाव…" : "Interview, wedding, election…"}
+              placeholder={lang === "hi" ? "इंटरव्यू, कॉल, खरीदारी…" : "Interview, call, purchase…"}
               className="h-11 w-full rounded-md border border-line bg-surface px-3 outline-none focus:border-accent"
             />
             <p className="mt-2 text-xs text-muted">
@@ -297,9 +297,27 @@ function MuhuratPage() {
             </p>
           </div>
           {current ? (
-            <p className="rounded-lg bg-surface-2 px-3 py-2 text-sm">
-              {lang === "hi" ? "चुना काम" : "Chosen work"} · {lang === "hi" ? current.nameHi : current.name}
-            </p>
+            <div className="rounded-lg bg-surface-2 px-3 py-3 text-sm leading-relaxed">
+              <p>
+                {lang === "hi" ? "चुना काम" : "Chosen work"} · {lang === "hi" ? current.nameHi : current.name}
+              </p>
+              <p className="mt-2 text-base">
+                {lang === "hi" ? "इस काम के नक्षत्र" : "Stars for this work"} ·{" "}
+                {current.preferredNakshatra.map((s) => localName(s, lang)).join(", ")}
+              </p>
+              <p className="mt-1">
+                {lang === "hi" ? "वार" : "Weekday"} · {current.preferredVara.map((s) => localName(s, lang)).join(", ")}
+                {" · "}
+                {lang === "hi" ? "कारक" : "Karaka"} · {current.karaka.map((s) => localName(s, lang)).join(", ")}
+                {" · "}
+                {lang === "hi" ? "छोड़ें तिथि" : "Skip tithi"} · {current.avoidTithi.join(", ")}
+              </p>
+              <p className="mt-2">
+                {lang === "hi"
+                  ? `${current.nameHi} के लिए नक्षत्र ${current.preferredNakshatra.map((s) => localName(s, lang)).join(", ")} रखे हैं। वार ${current.preferredVara.map((s) => localName(s, lang)).join(", ")}। तिथि ${current.avoidTithi.join(", ")} छोड़ें। नक्षत्र सूची में हो, वार चुना हो और तिथि छोड़ी हुई न हो, तभी इस काम का शुभ मुहूर्त माना जाता है।`
+                  : current.blurb}
+              </p>
+            </div>
           ) : null}
           <div>
             <PlacePicker
@@ -655,6 +673,28 @@ function ScoreCard({ title, result, alert, rank }: { title: string; result: Scor
   };
   const bag = [...result.sutra.blocks, ...result.sutra.cautions].join(" | ").toLowerCase();
   const has = (s: string) => bag.includes(s.toLowerCase());
+  const starFit = !!act?.preferredNakshatra.includes(p.nakshatra.name);
+  const tithiBad = !!act?.avoidTithi.includes(p.tithi.number);
+  const varaOk = !act || act.preferredVara.includes(p.vara.name);
+  const activityLine = closed
+    ? hi
+      ? "यह समय इस काम के लिए निषिद्ध है।"
+      : "This time is prohibited for this work."
+    : tithiBad
+      ? hi
+        ? "निषिद्ध तिथि। यह तिथि इस काम की छोड़ने वाली सूची में है।"
+        : "Prohibited tithi for this work."
+      : !starFit
+        ? hi
+          ? "इस काम का शुभ नक्षत्र इस घंटे में नहीं है।"
+          : "An auspicious nakshatra for this work is not on this hour."
+        : !varaOk
+          ? hi
+            ? "यह वार इस काम के चुने वार में नहीं है।"
+            : "This weekday is not a chosen weekday for this work."
+          : hi
+            ? "इस काम का शुभ मुहूर्त उपलब्ध है।"
+            : "An auspicious muhurat for this work is available.";
   const strong = result.muhurta.grahas.filter((g) => g.digbal).map((g) => nm(g.name));
   const disha: Record<string, string> = {
     Sunday: "West",
@@ -707,6 +747,14 @@ function ScoreCard({ title, result, alert, rank }: { title: string; result: Scor
               {hi ? "जगह" : "Place"} · {result.muhurta.place}
             </p>
           ) : null}
+          <p className="mt-3 text-base text-[#fff6dc]">{activityLine}</p>
+          <p className="mt-1 text-sm text-[#cbb892]">
+            {hi ? "मुहूर्त" : "Muhurat"} {start}–{end}
+            {" · "}
+            {hi ? "नक्षत्र" : "Nakshatra"} {nm(p.nakshatra.name)}
+            {" · "}
+            {hi ? "तिथि" : "Tithi"} {nm(p.tithi.name)}
+          </p>
         </div>
 
         <div className="flex items-center justify-between gap-3 rounded-xl border border-[#d4b15a]/30 bg-[#10182c] px-4 py-3">
@@ -727,6 +775,15 @@ function ScoreCard({ title, result, alert, rank }: { title: string; result: Scor
             </li>
           ))}
         </ol>
+        <p className="text-sm leading-relaxed text-[#fff6dc]">
+          {starFit
+            ? hi
+              ? `${nm(p.nakshatra.name)} इस काम के नक्षत्रों में है। इसीलिए यह घंटा ऊपर आया।`
+              : `${nm(p.nakshatra.name)} is one of this work's stars. That is why this hour ranks higher.`
+            : hi
+              ? `${nm(p.nakshatra.name)} इस काम की नक्षत्र सूची में नहीं है। सूची: ${act?.preferredNakshatra.map((s) => nm(s)).join(", ") ?? ""}।`
+              : `${nm(p.nakshatra.name)} is not in this work's star list. The list is ${act?.preferredNakshatra.map((s) => nm(s)).join(", ") ?? ""}.`}
+        </p>
 
         <div className="space-y-3 rounded-xl border border-[#d4b15a]/25 bg-[#0c1224] px-4 py-3 text-sm leading-relaxed">
           <div>
@@ -761,6 +818,15 @@ function ScoreCard({ title, result, alert, rank }: { title: string; result: Scor
               {holashtak
                 ? hi ? "होलाष्टक। विवाह और नई शुरुआत टालें।" : "Holashtak. Hold a wedding and a fresh start."
                 : hi ? "होलाष्टक नहीं।" : "Not Holashtak."}
+            </p>
+            <p className="mt-2">
+              {result.sutra.blocks.length
+                ? hi
+                  ? `बंद करने वाले सूत्र: ${result.sutra.blocks.map((s) => nm(s)).join(", ")}।`
+                  : `Closed by: ${result.sutra.blocks.map((s) => nm(s)).join(", ")}.`
+                : hi
+                  ? "शुक्र-गुरु अस्त, शिशुत्व, वृद्धत्व, अधिक मास और पाँच मिनट से छोटी खिड़की इस घंटे में नहीं है।"
+                  : "Shukra or Guru asta, shishutva, vriddhatva, adhik masa and a window under five minutes are not on this hour."}
             </p>
             {travel ? (
               <p className="mt-2">

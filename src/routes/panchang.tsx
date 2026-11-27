@@ -73,43 +73,69 @@ function PanchangPage() {
       </div>
 
       <Card>
-        <h2 className="font-display text-2xl">{tx("The day", "यह दिन")}</h2>
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <Clock k={tx("Sunrise", "सूर्योदय")} v={formatTime(p.sunrise)} />
+          <Clock k={tx("Sunset", "सूर्यास्त")} v={formatTime(p.sunset)} />
+          <Clock k={tx("Moonrise", "चंद्रोदय")} v={place.moonrise ? formatTime(place.moonrise) : "—"} />
+          <Clock k={tx("Moonset", "चंद्रास्त")} v={place.moonset ? formatTime(place.moonset) : "—"} />
+        </div>
+      </Card>
+
+      <Card>
+        <h2 className="font-display text-2xl">{tx("Panchang", "पंचांग")}</h2>
+        <p className="mt-1 text-sm text-muted">
+          {tx("Each limb is shown up to the minute it ends.", "हर अंग उस मिनट तक है जब वह खत्म होता है।")}
+        </p>
         <dl className="mt-3 divide-y divide-line text-base">
-          <Row k={tx("Sunrise", "सूर्योदय")} v={formatTime(p.sunrise)} />
-          <Row k={tx("Sunset", "सूर्यास्त")} v={formatTime(p.sunset)} />
+          {span.limbs.map((limb) => (
+            <Row
+              key={limb.limb}
+              k={nm(limb.limb)}
+              v={limb.parts
+                .map((part) => `${part.name.split(" · ").map((bit) => nm(bit)).join(" ")} ${tx("upto", "तक")} ${formatTime(part.until)}`)
+                .join(" · ")}
+            />
+          ))}
           <Row k={tx("Weekday", "वार")} v={nm(p.vara.name)} />
           <Row k={tx("Paksha", "पक्ष")} v={nm(p.tithi.paksha)} />
-          <Row k={tx("Moon sign", "चंद्र राशि")} v={nm(p.moonRashi.name)} />
-          <Row k={tx("Sun sign", "सूर्य राशि")} v={nm(p.sunRashi.name)} />
-          <Row k={tx("Abhijit", "अभिजित")} v={`${formatTime(p.abhijit.start)} – ${formatTime(p.abhijit.end)}`} />
-          <Row k={tx("Rahu", "राहु काल")} v={`${formatTime(marks.rahu.from)} – ${formatTime(marks.rahu.until)}`} />
-          <Row k={tx("Yamaganda", "यमगंड")} v={`${formatTime(marks.yamaganda.from)} – ${formatTime(marks.yamaganda.until)}`} />
-          <Row k={tx("Gulika", "गुलिक")} v={`${formatTime(marks.gulika.from)} – ${formatTime(marks.gulika.until)}`} />
-          {span.limbs.map((limb) => {
-            const part = limb.parts[0];
-            if (!part) return null;
-            return (
-              <Row
-                key={limb.limb}
-                k={nm(limb.limb)}
-                v={`${nm(part.name)} · ${formatTime(part.from)} – ${formatTime(part.until)}`}
-              />
-            );
-          })}
         </dl>
       </Card>
 
       <Card>
-        <h2 className="font-display text-xl">{tx("This place", "यह जगह")}</h2>
-        <dl className="mt-4 divide-y divide-line">
-          <Row k={tx("City", "शहर")} v={profile.city} />
-          <Row k={tx("Lunar day", "चांद्र दिन")} v={`${place.tithiDay}, ${localMonth(place.month, lang)}`} />
+        <h2 className="font-display text-xl">{tx("Month and signs", "मास और राशि")}</h2>
+        <dl className="mt-3 divide-y divide-line text-base">
+          <Row k={tx("Lunar day", "चांद्र दिन")} v={`${place.tithiDay} ${localMonth(place.month, lang)}`} />
           <Row k={tx("At sunrise", "सूर्योदय पर")} v={`${nm(place.paksha)} ${nm(place.tithiName)}`} />
-          <Row k={tx("Samvat", "संवत्")} v={`${place.samvat} ${tx("Vikrama", "विक्रम")} · ${place.system}`} />
-          <Row k={tx("Moonrise", "चंद्रोदय")} v={place.moonrise ? formatTime(place.moonrise) : tx("None", "नहीं")} />
-          <Row k={tx("Moonset", "चंद्रास्त")} v={place.moonset ? formatTime(place.moonset) : tx("No moonset", "चंद्रास्त नहीं")} />
+          <Row k={tx("Amanta month", "अमांत मास")} v={localMonth(place.month, lang)} />
+          <Row k={tx("Vikram samvat", "विक्रम संवत्")} v={String(place.samvat)} />
+          <Row k={tx("Shaka samvat", "शक संवत्")} v={String(place.samvat - 135)} />
+          <Row k={tx("Moon sign", "चंद्र राशि")} v={`${nm(p.moonRashi.name)} · ${tx("pada", "पद")} ${p.nakshatra.pada}`} />
+          <Row k={tx("Sun sign", "सूर्य राशि")} v={nm(p.sunRashi.name)} />
+          <Row k={tx("Vedic ritu", "वैदिक ऋतु")} v={nm(vedicRitu(p.sunRashi.name))} />
+          <Row k={tx("Ayana", "अयन")} v={nm(ayanaOf(p.sunRashi.name))} />
+          <Row k={tx("Day length", "दिनमान")} v={spanText(p.sunrise, p.sunset, lang)} />
+          <Row k={tx("Night length", "रात्रिमान")} v={spanText(p.sunset, span.nextSunrise, lang)} />
         </dl>
       </Card>
+
+      <div className="grid gap-3 sm:grid-cols-2">
+        <Card>
+          <h2 className="font-display text-xl">{tx("Auspicious", "शुभ काल")}</h2>
+          <dl className="mt-3 divide-y divide-line text-base">
+            <Row k={tx("Brahma muhurta", "ब्रह्म मुहूर्त")} v={`${formatTime(new Date(new Date(p.sunrise).getTime() - 96 * 60000).toISOString())} – ${formatTime(new Date(new Date(p.sunrise).getTime() - 48 * 60000).toISOString())}`} />
+            <Row k={tx("Abhijit", "अभिजित")} v={`${formatTime(p.abhijit.start)} – ${formatTime(p.abhijit.end)}`} />
+            <Row k={tx("Madhyahna", "मध्याह्न")} v={formatTime(new Date((new Date(p.sunrise).getTime() + new Date(p.sunset).getTime()) / 2).toISOString())} />
+          </dl>
+        </Card>
+        <Card>
+          <h2 className="font-display text-xl">{tx("Inauspicious", "अशुभ काल")}</h2>
+          <dl className="mt-3 divide-y divide-line text-base">
+            <Row k={tx("Rahu Kalam", "राहु काल")} v={`${formatTime(marks.rahu.from)} – ${formatTime(marks.rahu.until)}`} />
+            <Row k={tx("Yamaganda", "यमगंड")} v={`${formatTime(marks.yamaganda.from)} – ${formatTime(marks.yamaganda.until)}`} />
+            <Row k={tx("Gulika", "गुलिक")} v={`${formatTime(marks.gulika.from)} – ${formatTime(marks.gulika.until)}`} />
+          </dl>
+        </Card>
+      </div>
 
       <div className="grid grid-cols-2 gap-3">
         <Card className="rounded-xl p-4">
@@ -476,6 +502,38 @@ function LimbNow({
         </p>
       ) : null}
       <p className="mt-2 text-base leading-relaxed">{body}</p>
+    </div>
+  );
+}
+
+function vedicRitu(sun: string) {
+  const map: Record<string, string> = {
+    Mesha: "Vasanta", Vrishabha: "Vasanta",
+    Mithuna: "Grishma", Karka: "Grishma",
+    Simha: "Varsha", Kanya: "Varsha",
+    Tula: "Sharad", Vrishchika: "Sharad",
+    Dhanu: "Hemanta", Makara: "Hemanta",
+    Kumbha: "Shishira", Meena: "Shishira",
+  };
+  return map[sun] ?? sun;
+}
+
+function ayanaOf(sun: string) {
+  return ["Karka", "Simha", "Kanya", "Tula", "Vrishchika", "Dhanu"].includes(sun) ? "Dakshinayana" : "Uttarayana";
+}
+
+function spanText(fromIso: string, untilIso: string, lang: "hi" | "en") {
+  const mins = Math.max(0, Math.round((new Date(untilIso).getTime() - new Date(fromIso).getTime()) / 60000));
+  const h = Math.floor(mins / 60);
+  const m = mins % 60;
+  return lang === "hi" ? `${h} घं ${m} मि` : `${h}h ${m}m`;
+}
+
+function Clock({ k, v }: { k: string; v: string }) {
+  return (
+    <div>
+      <p className="text-xs text-muted">{k}</p>
+      <p className="mt-1 font-display text-2xl tabular-nums">{v}</p>
     </div>
   );
 }
